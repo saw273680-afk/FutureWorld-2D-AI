@@ -1,0 +1,65 @@
+
+<div class="min-h-screen bg-slate-950 text-slate-200 selection:bg-cyan-500 selection:text-white">
+  <!-- Navbar -->
+  <nav class="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-cyan-500/20">
+            FW
+          </div>
+          <span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-400 hidden md:block">
+            FutureWorld 2D
+          </span>
+        </div>
+        
+        <!-- Responsive Nav -->
+        <div class="flex space-x-1 md:space-x-4 overflow-x-auto">
+          <button (click)="currentView.set('dashboard')" 
+            class="px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap"
+            [class]="currentView() === 'dashboard' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+            ပင်မစာမျက်နှာ
+          </button>
+          <button (click)="currentView.set('simulation')" 
+            class="px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap"
+            [class]="currentView() === 'simulation' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+            တွက်ချက်စမ်းသပ်ရန်
+          </button>
+          <button (click)="currentView.set('history')"
+            class="px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap"
+            [class]="currentView() === 'history' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+            မှတ်တမ်း
+          </button>
+          <button (click)="currentView.set('backtest')"
+            class="px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap"
+            [class]="currentView() === 'backtest' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+            တိကျမှုစစ်ဆေးရန်
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    @switch (currentView()) {
+      @case ('dashboard') {
+        <app-dashboard />
+      }
+      @case ('history') {
+        <app-history />
+      }
+      @case ('backtest') {
+        <app-backtest />
+      }
+      @case ('simulation') {
+        <app-simulation />
+      }
+    }
+  </main>
+  
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 mt-12 py-8 text-center text-slate-500 text-sm">
+    <p>© 2024 FutureWorld 2D AI Systems. ပညာရေးအတွက် ရည်ရွယ်သည်။</p>
+  </footer>
+</div>

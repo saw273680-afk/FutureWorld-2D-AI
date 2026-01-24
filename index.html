@@ -1,0 +1,77 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FutureWorld 2D AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #0f172a; /* Slate 900 */
+        color: #e2e8f0; /* Slate 200 */
+      }
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1e293b; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #475569; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #64748b; 
+      }
+
+      /* PRINT STYLES FOR POS VOUCHER */
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+        #printable-voucher, #printable-voucher * {
+          visibility: visible;
+        }
+        #printable-voucher {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 80mm; /* Standard POS width */
+          margin: 0;
+          padding: 10px;
+          color: black;
+          background: white;
+        }
+        /* Hide navbar and other UI */
+        nav, footer, button, .no-print {
+          display: none !important;
+        }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "rxjs": "https://esm.sh/rxjs@^7.8.2?conditions=es2015",
+    "rxjs/operators": "https://esm.sh/rxjs@^7.8.2/operators?conditions=es2015",
+    "rxjs/ajax": "https://esm.sh/rxjs@^7.8.2/ajax?conditions=es2015",
+    "rxjs/webSocket": "https://esm.sh/rxjs@^7.8.2/webSocket?conditions=es2015",
+    "rxjs/testing": "https://esm.sh/rxjs@^7.8.2/testing?conditions=es2015",
+    "rxjs/fetch": "https://esm.sh/rxjs@^7.8.2/fetch?conditions=es2015",
+    "@angular/platform-browser": "https://esm.sh/@angular/platform-browser@^21.1.1?external=rxjs",
+    "@angular/compiler": "https://esm.sh/@angular/compiler@^21.1.1?external=rxjs",
+    "@angular/core": "https://esm.sh/@angular/core@^21.1.1?external=rxjs",
+    "@angular/common": "https://esm.sh/@angular/common@^21.1.1?external=rxjs",
+    "@angular/forms": "https://esm.sh/@angular/forms@^21.1.1?external=rxjs"
+  }
+}
+</script>
+</head>
+  <body>
+    <app-root></app-root>
+  </body>
+</html>
