@@ -1,5 +1,5 @@
 
-import { Component, inject, signal, ViewChild, ElementRef, afterNextRender } from '@angular/core';
+import { Component, inject, signal, ViewChild, ElementRef, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ChatService } from '../services/chat.service';
@@ -99,20 +99,23 @@ export class AiChatComponent {
   @ViewChild('inputBox') private inputBox!: ElementRef<HTMLTextAreaElement>;
 
   constructor() {
-    afterNextRender(() => {
+    // Effect to scroll down when new messages are added
+    effect(() => {
+      // Access the signal to create a dependency
+      this.chatService.messages(); 
       this.scrollToBottom();
-      this.chatService.messages.subscribe(() => {
-        this.scrollToBottom();
-      });
+    });
+
+    // Effect to adjust textarea height as user types
+    effect(() => {
+      this.userInput(); // Access the signal
       this.adjustTextareaHeight();
-      this.userInput.subscribe(() => this.adjustTextareaHeight());
     });
   }
 
   sendMessage() {
     this.chatService.sendMessage(this.userInput());
     this.userInput.set('');
-    this.adjustTextareaHeight();
   }
 
   handleEnter(event: KeyboardEvent) {
@@ -127,6 +130,7 @@ export class AiChatComponent {
   }
 
   private scrollToBottom(): void {
+    // Use a timeout to ensure the DOM has been updated before scrolling.
     setTimeout(() => {
         try {
             if (this.scrollContainer) {
@@ -137,10 +141,11 @@ export class AiChatComponent {
   }
   
   private adjustTextareaHeight(): void {
+    // Use a timeout to allow the DOM to update with the new value first.
     setTimeout(() => {
       if (this.inputBox) {
         const textarea = this.inputBox.nativeElement;
-        textarea.style.height = 'auto';
+        textarea.style.height = 'auto'; // Reset height
         textarea.style.height = `${textarea.scrollHeight}px`;
       }
     }, 0);
