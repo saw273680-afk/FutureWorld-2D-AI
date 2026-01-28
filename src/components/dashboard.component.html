@@ -1,117 +1,100 @@
 
-<div class="max-w-2xl mx-auto space-y-6">
+<div class="max-w-md mx-auto space-y-4">
   
   <!-- Prompt to add API Key -->
   @if (!geminiService.hasApiKey()) {
-    <div class="bg-yellow-900/30 border border-yellow-700 text-yellow-200 text-sm rounded-lg p-4 flex flex-col md:flex-row items-center justify-between gap-3 animate-in fade-in duration-500">
-      <div class="flex items-start md:items-center gap-3">
-        <svg class="w-6 h-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
-        <span>Gemini AI ချိတ်ဆက်မထားပါ။ ပိုမိုတိကျသောခန့်မှန်းချက်များအတွက် API Key ထည့်သွင်းပါ။</span>
+    <div class="bg-yellow-900/30 border border-yellow-700 text-yellow-200 text-sm rounded-lg p-3 flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in duration-500">
+      <div class="flex items-start sm:items-center gap-2">
+        <svg class="w-5 h-5 flex-shrink-0 mt-0.5 sm:mt-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+        <span>Gemini AI ချိတ်ဆက်မထားပါ။</span>
       </div>
-       <button (click)="goToSettings()" class="bg-yellow-600/20 hover:bg-yellow-600/40 text-white font-bold py-1 px-4 rounded-lg transition-colors whitespace-nowrap text-xs md:text-sm">
-        ဆက်တင်သို့သွားမည်
+       <button (click)="goToSettings()" class="bg-yellow-600/20 hover:bg-yellow-600/40 text-white font-bold py-1 px-3 rounded-lg transition-colors whitespace-nowrap text-xs">
+        Key ထည့်ရန်
       </button>
     </div>
   }
 
-
-  <!-- Live Data Card (Conditionally Rendered for future Windows App) -->
-  @if(liveMarketData().isLive) {
-    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700 shadow-xl relative overflow-hidden animate-in fade-in duration-500">
-      <div class="flex justify-between items-center">
-        <div class="flex items-center gap-4">
-          <div>
-            <div class="text-xs text-slate-400 font-medium flex items-center gap-2">
-              <span>SET Index</span>
-              @if(liveMarketData().isLive) {
+  <!-- Main Live Display -->
+  <div class="text-center p-4 bg-slate-800 rounded-xl border border-slate-700 shadow-xl">
+    <div class="flex justify-between items-center">
+        <h2 class="text-xl font-bold text-cyan-400/50">V'IP 2D</h2>
+        @if(liveMarketData().isLive) {
+            <div class="flex items-center gap-2 text-xs text-green-400">
                 <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                <span class="text-green-400">Live</span>
-              } @else {
-                <span class="w-2 h-2 rounded-full bg-red-500"></span>
-                <span class="text-red-400">Offline</span>
-              }
+                LIVE
             </div>
-            <p class="text-3xl font-bold font-mono" [class]="liveDerivedData().isPositive ? 'text-green-400' : 'text-red-400'">
-              {{ liveMarketData().set }}
-            </p>
-          </div>
-          <div class="border-l border-slate-600 h-10 mx-2 hidden sm:block"></div>
-          <div class="hidden sm:block">
-            <p class="text-xs text-slate-400 font-medium">Value</p>
-            <p class="text-lg font-bold font-mono text-slate-300">{{ liveDerivedData().valueModern }}</p>
-          </div>
-        </div>
-        
-        <div class="text-center">
-          <p class="text-xs text-cyan-400 font-medium">ထွက်ဂဏန်း</p>
-          <p class="text-5xl font-black text-cyan-400" style="text-shadow: 0 0 10px #22d3ee80;">
-            {{ liveDerivedData().set2D }}
-          </p>
-        </div>
-      </div>
-      @if(liveMarketData().error) {
-        <div class="text-center text-xs text-yellow-500 font-mono pt-2 border-t border-slate-700 mt-3">
-          {{ liveMarketData().error }}
-        </div>
-      }
+        }
     </div>
-  }
+    <div class="text-9xl font-black text-yellow-400 drop-shadow-[0_5px_15px_rgba(250,204,21,0.4)] my-2">
+      {{ liveDerivedData().set2D }}
+    </div>
+    <p class="text-xs text-slate-500 font-mono">
+        {{ liveMarketData().lastUpdated ? 'Updated: ' + liveMarketData().lastUpdated : 'Fetching data...' }}
+    </p>
+    @if (liveMarketData().error) {
+      <p class="text-xs text-yellow-500 mt-2 font-mono animate-pulse">{{ liveMarketData().error }}</p>
+    }
+  </div>
 
-  <!-- Main Content Area: Always shows the next day's prediction -->
-  <div class="space-y-6 animate-in fade-in duration-500">
-    @if (prediction(); as pred) {
-      <div class="bg-slate-800 rounded-2xl p-6 border border-slate-700 shadow-xl">
-         <h2 class="text-xl font-bold text-white mb-1">{{ pageTitle }}</h2>
-         
-         @if (pred.meta.engineUsed === 'gemini') {
-            <p class="text-slate-400 text-sm mb-6">AI v10.0 <span class="font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">Gemini Fusion</span> မှ တွက်ချက်ထားသည်။</p>
-         } @else {
-            <p class="text-slate-400 text-sm mb-6"><span class="font-bold text-yellow-400">Phoenix Engine v7.0</span> မှ တွက်ချက်ထားသည်။</p>
-         }
-         
-         <h3 class="text-cyan-400 text-sm font-semibold uppercase tracking-wider mb-4">VVIP (၁၀) ကွက်</h3>
-         <div class="grid grid-cols-5 gap-3">
-           @for (item of pred.highConfidence; track item.num; let i = $index) {
-             <div class="bg-slate-700 rounded-lg p-2 text-center border-b-4" [class]="i === 0 ? 'border-cyan-500' : 'border-slate-600'">
-               <span class="text-3xl font-black text-white block">{{ item.num }}</span>
-             </div>
-           }
-           @for (item of pred.mediumConfidence; track item.num) {
-             <div class="bg-slate-700 rounded-lg p-2 text-center border-b-4 border-slate-600">
-               <span class="text-3xl font-bold text-slate-200 block">{{ item.num }}</span>
-             </div>
-           }
-         </div>
+  <!-- SET and VALUE cards -->
+  <div class="grid grid-cols-2 gap-4">
+    <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center">
+      <p class="text-xs text-slate-400">SET</p>
+      <p class="text-2xl font-bold font-mono" [class]="liveDerivedData().isPositive ? 'text-green-400' : 'text-red-400'">{{ liveMarketData().set }}</p>
+    </div>
+    <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center">
+      <p class="text-xs text-slate-400">VALUE</p>
+      <p class="text-2xl font-bold font-mono text-slate-300">{{ liveDerivedData().valueModern }}</p>
+    </div>
+  </div>
+
+  <!-- AM/PM Result cards -->
+  <div class="grid grid-cols-2 gap-4">
+    <div class="bg-slate-800 p-3 rounded-xl border border-slate-700">
+      <p class="text-center text-sm font-bold text-slate-300 mb-2">12:01 PM</p>
+      <p class="text-center text-5xl font-bold text-cyan-400">{{ displayRecord().am }}</p>
+      <div class="flex justify-between text-xs text-slate-500 font-mono mt-2 pt-2 border-t border-slate-700">
+        <span>SET: {{ displayRecord().set }}</span>
       </div>
-      @if (pred.insights.length > 0) {
-        <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-           <h4 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">AI သုံးသပ်ချက်</h4>
-           <ul class="space-y-1.5 text-xs text-slate-400">
-            @for(insight of pred.insights; track insight) {
-              <li class="flex items-start gap-2">
-                <svg class="w-3 h-3 mt-0.5 flex-shrink-0 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m5.25 4.5 7.5 7.5-7.5 7.5" /></svg>
-                <span>{{ insight }}</span>
-              </li>
-            }
-           </ul>
-            <!-- Strongest Head & Tail Section -->
-            <div class="mt-4 pt-4 border-t border-slate-700 flex justify-around items-center text-sm">
-              <div class="text-center">
-                <span class="text-slate-400 text-xs uppercase">အထူးထိပ်စီး</span>
-                <p class="text-white text-3xl font-bold">{{ pred.strongestHead }}</p>
-              </div>
-               <div class="text-center">
-                <span class="text-slate-400 text-xs uppercase">အထူးနောက်ပိတ်</span>
-                <p class="text-white text-3xl font-bold">{{ pred.strongestTail }}</p>
-              </div>
-            </div>
-        </div>
-      }
+    </div>
+    <div class="bg-slate-800 p-3 rounded-xl border border-slate-700">
+      <p class="text-center text-sm font-bold text-slate-300 mb-2">4:30 PM</p>
+      <p class="text-center text-5xl font-bold text-purple-400">{{ displayRecord().pm }}</p>
+       <div class="flex justify-between text-xs text-slate-500 font-mono mt-2 pt-2 border-t border-slate-700">
+        <span>&nbsp;</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modern/Internet/TW Prediction Table -->
+  <div class="bg-slate-800 rounded-xl border border-slate-700">
+    @if(prediction(); as pred) {
+      <table class="w-full text-center">
+        <thead>
+          <tr class="text-slate-400 text-sm">
+            <th class="p-2">AI</th>
+            <th class="p-2 font-medium">Modern</th>
+            <th class="p-2 font-medium">Internet</th>
+            <th class="p-2 font-medium">TW</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-t border-slate-700">
+            <td class="p-2 text-xs text-slate-400">9:30 AM</td>
+            <td class="p-2 text-xl font-bold">{{ pred.highConfidence[0]?.num || '--' }}</td>
+            <td class="p-2 text-xl font-bold">{{ pred.highConfidence[1]?.num || '--' }}</td>
+            <td class="p-2 text-xl font-bold">{{ pred.highConfidence[2]?.num || '--' }}</td>
+          </tr>
+          <tr class="border-t border-slate-700">
+            <td class="p-2 text-xs text-slate-400">2:00 PM</td>
+            <td class="p-2 text-xl font-bold">{{ pred.highConfidence[3]?.num || '--' }}</td>
+            <td class="p-2 text-xl font-bold">{{ pred.highConfidence[4]?.num || '--' }}</td>
+            <td class="p-2 text-xl font-bold">{{ pred.mediumConfidence[0]?.num || '--' }}</td>
+          </tr>
+        </tbody>
+      </table>
     } @else {
-      <div class="text-center py-20 bg-slate-800/50 rounded-xl border border-dashed border-slate-700">
-        <div class="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p class="text-slate-400 animate-pulse">AI Engine အား စတင်နေပါသည်...</p>
-      </div>
+        <div class="p-4 text-center text-xs text-slate-500">AI predictions loading...</div>
     }
   </div>
 

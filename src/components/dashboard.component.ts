@@ -5,6 +5,7 @@ import { MarketEventService } from '../services/market-event.service';
 import { LiveMarketService } from '../services/live-market.service';
 import { GeminiService } from '../services/gemini.service';
 import { AppComponent } from '../app.component';
+import { StoreService } from '../services/store.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -17,11 +18,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   liveMarketService = inject(LiveMarketService);
   geminiService = inject(GeminiService);
   app = inject(AppComponent);
+  store = inject(StoreService);
 
-  // The service now only provides the next day's prediction.
   prediction = this.marketEventService.prediction;
-  
-  // Live data state for the future desktop app.
   liveMarketData = this.liveMarketService.marketData;
 
   liveDerivedData = computed(() => {
@@ -39,7 +38,32 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return { set2D, valueModern, isPositive };
   });
 
-  pageTitle = 'နောက်တစ်နေ့အတွက် AI ကြိုတင်ခန့်မှန်းချက်';
+  displayRecord = computed(() => {
+    const latest = this.store.latestRecord();
+    if (!latest) {
+      return { am: '--', pm: '--', set: '----.--', value: '---,---.--' };
+    }
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    
+    let pmValue = latest.pm;
+    // If the latest record is for today, hide the PM value until after 4:30 PM market close
+    if (latest.date === todayStr) {
+      const isAfterClose = now.getHours() > 16 || (now.getHours() === 16 && now.getMinutes() >= 30);
+      if (!isAfterClose) {
+        pmValue = '--';
+      }
+    }
+
+    return {
+      am: latest.am,
+      pm: pmValue,
+      set: latest.set || '----.--',
+      value: latest.value || '---,---.--'
+    };
+  });
+
 
   ngOnInit() {
     this.marketEventService.start();
