@@ -12,10 +12,12 @@ export interface LotteryRecord {
 }
 
 export interface AIWeights {
-  recency: number;   // Weight for recent trends
-  seasonal: number;  // Weight for yearly patterns
-  dayOfWeek: number; // Weight for specific day logic
-  market: number;    // Weight for Set/Value math
+  recency: number;
+  seasonal: number;
+  dayOfWeek: number;
+  market: number;
+  relationship: number; // For Power, Nakhat, Brother
+  trend: number;     // For Head/Tail trends
 }
 
 @Injectable({
@@ -25,12 +27,14 @@ export class StoreService {
   private readonly STORAGE_KEY = 'futureworld_2d_data_v5'; 
   private readonly WEIGHTS_KEY = 'futureworld_ai_weights';
 
-  // Default Weights
+  // Default Weights for new Ensemble-like system
   private readonly DEFAULT_WEIGHTS: AIWeights = {
-    recency: 0.4,
-    seasonal: 0.2,
-    dayOfWeek: 0.2,
-    market: 0.2
+    recency: 0.30,
+    seasonal: 0.05,
+    dayOfWeek: 0.05,
+    market: 0.10,
+    relationship: 0.30,
+    trend: 0.20
   };
   
   // State
@@ -65,7 +69,9 @@ export class StoreService {
     const stored = localStorage.getItem(this.WEIGHTS_KEY);
     if (stored) {
       try {
-        this.aiWeights.set(JSON.parse(stored));
+        const loadedWeights = JSON.parse(stored);
+        // Ensure new properties exist
+        this.aiWeights.set({...this.DEFAULT_WEIGHTS, ...loadedWeights});
       } catch {
         this.aiWeights.set(this.DEFAULT_WEIGHTS);
       }

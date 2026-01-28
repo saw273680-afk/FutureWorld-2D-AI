@@ -11,7 +11,7 @@ import { EngineService, PredictionResult } from '../services/engine.service';
   template: `
     <div class="max-w-4xl mx-auto pb-12">
        <div class="text-center mb-8">
-         <h2 class="text-2xl font-bold text-white mb-2">Simulation Mode (အနာဂတ် ခန့်မှန်းစနစ်)</h2>
+         <h2 class="text-2xl font-bold text-white mb-2">Simulation စနစ် (အနာဂတ် ကြိုတင်တွက်ချက်မှု)</h2>
          <p class="text-slate-400 text-sm">
             {{ modeText() }}
          </p>
@@ -52,7 +52,12 @@ import { EngineService, PredictionResult } from '../services/engine.service';
                 [disabled]="!isValidInput()"
                 (click)="simulate()" 
                 class="w-full md:w-auto bg-gradient-to-r hover:from-purple-500 hover:to-pink-500 disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500 text-white font-bold py-3 px-12 rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
-                [ngClass]="isAmOnly() ? 'from-cyan-600 to-blue-600 shadow-cyan-600/20' : 'from-purple-600 to-pink-600 shadow-purple-600/20'">
+                [class.from-cyan-600]="isAmOnly()"
+                [class.to-blue-600]="isAmOnly()"
+                [class.shadow-cyan-600/20]="isAmOnly()"
+                [class.from-purple-600]="!isAmOnly()"
+                [class.to-pink-600]="!isAmOnly()"
+                [class.shadow-purple-600/20]="!isAmOnly()">
                 
                 @if (isAmOnly()) {
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
@@ -64,9 +69,11 @@ import { EngineService, PredictionResult } from '../services/engine.service';
              </button>
           </div>
           
-          <p *ngIf="!isValidInput() && (amInput || pmInput)" class="text-center text-red-400 text-xs mt-4 animate-pulse">
-             အနည်းဆုံး ဂဏန်းတစ်ကွက် ထည့်သွင်းပါ
-          </p>
+          @if (!isValidInput() && (amInput || pmInput)) {
+            <p class="text-center text-red-400 text-xs mt-4 animate-pulse">
+               အနည်းဆုံး ဂဏန်းတစ်ကွက် ထည့်သွင်းပါ
+            </p>
+          }
        </div>
 
        <!-- Results Section -->
@@ -76,7 +83,7 @@ import { EngineService, PredictionResult } from '../services/engine.service';
             <!-- Header -->
             <div class="flex items-center justify-between px-2">
                <h3 class="text-white font-bold flex items-center gap-2">
-                  <span class="w-2 h-2 rounded-full animate-pulse" [ngClass]="isAmOnly() ? 'bg-cyan-400' : 'bg-purple-400'"></span>
+                  <span class="w-2 h-2 rounded-full animate-pulse" [class.bg-cyan-400]="isAmOnly()" [class.bg-purple-400]="!isAmOnly()"></span>
                   {{ resultTitle() }}
                </h3>
             </div>
@@ -86,10 +93,11 @@ import { EngineService, PredictionResult } from '../services/engine.service';
                @for (item of res.highConfidence; track item.num) {
                  <div class="relative group">
                     <div class="rounded-xl p-4 text-center transform transition group-hover:-translate-y-1 shadow-lg border"
-                         [ngClass]="isAmOnly() ? 'bg-cyan-600 shadow-cyan-900/50 border-cyan-500' : 'bg-purple-600 shadow-purple-900/50 border-purple-500'">
+                         [class.bg-cyan-600]="isAmOnly()" [class.shadow-cyan-900/50]="isAmOnly()" [class.border-cyan-500]="isAmOnly()"
+                         [class.bg-purple-600]="!isAmOnly()" [class.shadow-purple-900/50]="!isAmOnly()" [class.border-purple-500]="!isAmOnly()">
                       <span class="text-4xl font-black text-white block">{{ item.num }}</span>
                       <div class="mt-2 text-xs font-medium bg-black/20 text-white rounded px-2 py-1 inline-block">
-                         {{ item.confidence }}% Conf.
+                         {{ item.confidence }}%
                       </div>
                     </div>
                     <!-- Tooltip -->
@@ -113,7 +121,7 @@ import { EngineService, PredictionResult } from '../services/engine.service';
                
                <!-- Medium Confidence -->
                <div class="bg-slate-800 rounded-xl p-6 border border-slate-700">
-                  <h4 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">အရံသင့် ဂဏန်းများ</h4>
+                  <h4 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">အရံ ဂဏန်းများ</h4>
                   <div class="flex flex-wrap gap-2">
                      @for (item of res.mediumConfidence; track item.num) {
                         <div class="bg-slate-700 px-3 py-2 rounded text-white font-bold border border-slate-600">
@@ -130,14 +138,14 @@ import { EngineService, PredictionResult } from '../services/engine.service';
                   <ul class="space-y-2 text-sm text-slate-300">
                      @for (insight of res.insights; track insight) {
                         <li class="flex items-start gap-2">
-                           <svg class="w-4 h-4 mt-0.5 flex-shrink-0" [ngClass]="isAmOnly() ? 'text-cyan-400' : 'text-purple-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                           <svg class="w-4 h-4 mt-0.5 flex-shrink-0" [class.text-cyan-400]="isAmOnly()" [class.text-purple-400]="!isAmOnly()" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                            {{ insight }}
                         </li>
                      }
                   </ul>
                   <div class="mt-4 pt-4 border-t border-slate-700 flex justify-between items-center text-xs">
-                     <span class="text-slate-500">Strongest Head: <b class="text-white text-lg">{{ res.strongestHead }}</b></span>
-                     <span class="text-slate-500">Strongest Tail: <b class="text-white text-lg">{{ res.strongestTail }}</b></span>
+                     <span class="text-slate-500">အထူးထိပ်စီး: <b class="text-white text-lg">{{ res.strongestHead }}</b></span>
+                     <span class="text-slate-500">အထူးနောက်ပိတ်: <b class="text-white text-lg">{{ res.strongestTail }}</b></span>
                   </div>
                </div>
 
@@ -145,7 +153,7 @@ import { EngineService, PredictionResult } from '../services/engine.service';
          </div>
        } @else if (hasSearched()) {
           <div class="text-center py-12 bg-slate-800/50 rounded-xl border border-slate-700 border-dashed">
-             <div class="w-12 h-12 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-4" [ngClass]="isAmOnly() ? 'border-cyan-500' : 'border-purple-500'"></div>
+             <div class="w-12 h-12 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-4" [class.border-cyan-500]="isAmOnly()" [class.border-purple-500]="!isAmOnly()"></div>
              <p class="text-xs text-slate-500">စနစ်မှ တွက်ချက်နေပါသည်...</p>
           </div>
        }
@@ -173,8 +181,8 @@ export class SimulationComponent {
   });
 
   resultTitle = computed(() => {
-      if (this.isAmOnly()) return "ညနေပိုင်းအတွက် ခန့်မှန်းချက် (PM Forecast)";
-      return "နောက်ရက်အတွက် ခန့်မှန်းချက် (Next Day Forecast)";
+      if (this.isAmOnly()) return "ညနေပိုင်း ခန့်မှန်းချက်";
+      return "နောက်ရက်အတွက် ခန့်မှန်းချက်";
   });
 
   isValidInput() {
