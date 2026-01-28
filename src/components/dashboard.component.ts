@@ -3,6 +3,8 @@ import { Component, inject, OnDestroy, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MarketEventService } from '../services/market-event.service';
 import { LiveMarketService } from '../services/live-market.service';
+import { GeminiService } from '../services/gemini.service';
+import { AppComponent } from '../app.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -13,6 +15,8 @@ import { LiveMarketService } from '../services/live-market.service';
 export class DashboardComponent implements OnInit, OnDestroy {
   marketEventService = inject(MarketEventService);
   liveMarketService = inject(LiveMarketService);
+  geminiService = inject(GeminiService);
+  app = inject(AppComponent);
 
   // The service now only provides the next day's prediction.
   prediction = this.marketEventService.prediction;
@@ -43,5 +47,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.marketEventService.stop();
+  }
+  
+  goToSettings() {
+    this.app.currentView.set('settings');
   }
 }

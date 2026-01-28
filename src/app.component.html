@@ -20,6 +20,11 @@
             [class]="currentView() === 'dashboard' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
             ပင်မစာမျက်နှာ
           </button>
+          <button (click)="currentView.set('ai-chat')" 
+            class="px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap"
+            [class]="currentView() === 'ai-chat' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+            AI Chat
+          </button>
           <button (click)="currentView.set('simulation')" 
             class="px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap"
             [class]="currentView() === 'simulation' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
@@ -35,6 +40,11 @@
             [class]="currentView() === 'backtest' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
             တိကျမှုစစ်ဆေးရန်
           </button>
+          <button (click)="currentView.set('settings')"
+            class="px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap"
+            [class]="currentView() === 'settings' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+            ဆက်တင်
+          </button>
         </div>
       </div>
     </div>
@@ -46,6 +56,9 @@
       @case ('dashboard') {
         <app-dashboard />
       }
+      @case ('ai-chat') {
+        <app-ai-chat />
+      }
       @case ('history') {
         <app-history />
       }
@@ -54,6 +67,9 @@
       }
       @case ('simulation') {
         <app-simulation />
+      }
+      @case ('settings') {
+        <app-settings />
       }
     }
   </main>

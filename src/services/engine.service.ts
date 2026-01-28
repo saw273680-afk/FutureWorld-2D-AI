@@ -22,6 +22,7 @@ export interface PredictionResult {
   meta: {
     analyzedCount: number;
     weights: AIWeights;
+    engineUsed: 'gemini' | 'local';
   };
 }
 
@@ -44,7 +45,7 @@ export class EngineService {
   private store = inject(StoreService);
   private geminiService = inject(GeminiService);
 
-  // --- CORE PREDICTION ENGINE (v8.0 Gemini Fusion) ---
+  // --- CORE PREDICTION ENGINE (v10.0 Sentinel Prime with Fallback) ---
   async predictNext(customHistory?: LotteryRecord[]): Promise<PredictionResult> {
     const history = customHistory || this.store.records();
     const weights = this.store.aiWeights();
@@ -53,58 +54,69 @@ export class EngineService {
       return this.getEmptyResult("ဒေတာအလုံအလောက်မရှိပါ");
     }
 
-    // --- Step 1: Gemini AI Analysis (Primary) ---
-    const geminiResult = await this.geminiService.getGeminiPrediction(history.slice(0, 30));
-    
-    if (!geminiResult) {
-       return this.getEmptyResult("Gemini AI နှင့် ချိတ်ဆက်၍မရပါ။");
+    // --- Check for Gemini API Key and decide engine ---
+    if (this.geminiService.hasApiKey()) {
+      return this.runGeminiFusionEngine(history, weights);
+    } else {
+      return this.runLocalPhoenixEngine(history, weights);
     }
+  }
 
-    // --- Step 2: Local Phoenix Engine Analysis (Secondary) ---
-    const localResult = this.runLocalPrediction(history, weights);
-
-    // --- Step 3: Fuse the results ---
-    const geminiPicksSet = new Set(geminiResult.top_picks);
-
-    // High confidence are Gemini's top picks, padded to 10 if necessary
-    const highConfidence: ScoredNumber[] = geminiResult.top_picks.slice(0, 10).map(num => ({
-        num, score: 95, confidence: 95, tags: ['Gemini'], reasons: ['Gemini AI Top Pick']
-    }));
-
-    // Pad with local results if Gemini provides fewer than 10
-    let localIndex = 0;
-    while(highConfidence.length < 10 && localIndex < localResult.candidates.length) {
-      const candidate = localResult.candidates[localIndex];
-      if (!geminiPicksSet.has(candidate.num)) {
-        highConfidence.push(candidate);
-        geminiPicksSet.add(candidate.num);
+  private async runGeminiFusionEngine(history: LotteryRecord[], weights: AIWeights): Promise<PredictionResult> {
+      // --- Step 1: Gemini AI Analysis (Primary) ---
+      const geminiResult = await this.geminiService.getGeminiPrediction(history.slice(0, 30));
+      
+      if (!geminiResult) {
+        return this.getEmptyResult("Gemini AI နှင့် ချိတ်ဆက်၍မရပါ။");
       }
-      localIndex++;
-    }
 
-    // Medium confidence are the next best from local engine not already chosen
-    const mediumConfidence: ScoredNumber[] = localResult.candidates
-      .filter(c => !geminiPicksSet.has(c.num))
-      .slice(0, 6);
+      // --- Step 2: Local Phoenix Engine Analysis (Secondary) ---
+      const localResult = this.runLocalPrediction(history, weights);
 
-    // Combine insights
-    const insights = [
-      geminiResult.analysis_summary,
-      ...localResult.insights.slice(0,2) // Take top 2 local insights
-    ];
-    if (localResult.isDoubleRisk) insights.push("အပူးထွက်ရန် အားကောင်းနေသည်။");
+      // --- Step 3: Fuse the results ---
+      const highConfidence: ScoredNumber[] = geminiResult.top_picks.slice(0, 10).map(num => ({
+          num, score: 95, confidence: 95, tags: ['Gemini'], reasons: ['Gemini AI Top Pick']
+      }));
+      
+      const insights = [geminiResult.analysis_summary];
+      if (localResult.isDoubleRisk) insights.push("အပူးထွက်ရန် အားကောင်းနေသည်။");
 
 
-    return {
-      highConfidence: highConfidence.slice(0, 5), // VVIP
-      mediumConfidence: highConfidence.slice(5, 10), // VIP
-      eliminated: Array.from(localResult.excludedNumbers),
-      strongestHead: geminiResult.strongest_head,
-      strongestTail: geminiResult.strongest_tail,
-      insights,
-      isDoubleRisk: localResult.isDoubleRisk,
-      meta: { analyzedCount: history.length, weights }
-    };
+      return {
+        highConfidence: highConfidence.slice(0, 5), // VVIP
+        mediumConfidence: highConfidence.slice(5, 10), // VIP
+        eliminated: Array.from(localResult.excludedNumbers),
+        strongestHead: geminiResult.strongest_head,
+        strongestTail: geminiResult.strongest_tail,
+        insights,
+        isDoubleRisk: localResult.isDoubleRisk,
+        meta: { analyzedCount: history.length, weights, engineUsed: 'gemini' }
+      };
+  }
+
+  private runLocalPhoenixEngine(history: LotteryRecord[], weights: AIWeights): PredictionResult {
+      const localResult = this.runLocalPrediction(history, weights);
+      const topTen = localResult.candidates.slice(0, 10);
+      
+      // Derive strongest head/tail from top local prediction
+      const strongestHead = topTen.length > 0 ? topTen[0].num[0] : '-';
+      const strongestTail = topTen.length > 0 ? topTen[0].num[1] : '-';
+
+      const insights = [
+          "Phoenix Engine v7.0 ဖြင့်သာ တွက်ချက်ထားသည်။ ပိုမိုတိကျသောရလဒ်များအတွက် 'ဆက်တင်' တွင် Gemini API Key ထည့်သွင်းပါ။",
+          ...localResult.insights
+      ];
+
+      return {
+          highConfidence: topTen.slice(0, 5),
+          mediumConfidence: topTen.slice(5, 10),
+          eliminated: Array.from(localResult.excludedNumbers),
+          strongestHead,
+          strongestTail,
+          insights,
+          isDoubleRisk: localResult.isDoubleRisk,
+          meta: { analyzedCount: history.length, weights, engineUsed: 'local' }
+      };
   }
   
   private runLocalPrediction(history: LotteryRecord[], weights: AIWeights) {
@@ -164,7 +176,6 @@ export class EngineService {
           candidates,
           excludedNumbers,
           insights: [
-            `Phoenix Engine: လတ်တလော, ဆက်စပ်မှု, Break/Total, Digit Freq, Gap တို့ကို သုံးသပ်ထားသည်။`,
             excludedNumbers.size > 0 ? `မထွက်နိုင်သော ဂဏန်း ${excludedNumbers.size} လုံးကို ဖယ်ထုတ်ထားသည်။` : 'Phoenix Engine မှ ဖယ်ထုတ်ထားသောဂဏန်း မရှိပါ။'
           ],
           isDoubleRisk: this.checkDoubleRisk(history)
@@ -223,8 +234,10 @@ export class EngineService {
   }
 
   async predictPmGivenAm(am: string, history: LotteryRecord[]): Promise<PredictionResult> {
-      const prompt = `The morning result was ${am}. Based on all historical data where the morning number was ${am}, what is the most likely PM number? Provide your top 10 picks and analysis.`;
-      const geminiResult = await this.geminiService.getGeminiPrediction(history); // simplified for PM
+      if (!this.geminiService.hasApiKey()) {
+          return this.getEmptyResult("ညနေပိုင်းခန့်မှန်းချက်အတွက် Gemini AI Key လိုအပ်ပါသည်။");
+      }
+      const geminiResult = await this.geminiService.getGeminiPrediction(history);
       if (!geminiResult) return this.getEmptyResult("Gemini AI နှင့် ချိတ်ဆက်၍မရပါ။");
 
       const highConfidence = geminiResult.top_picks.slice(0, 10).map(num => ({
@@ -236,7 +249,7 @@ export class EngineService {
         mediumConfidence: highConfidence.slice(5,10),
         eliminated: [], strongestHead: geminiResult.strongest_head, strongestTail: geminiResult.strongest_tail,
         insights: [ geminiResult.analysis_summary, `မနက် ${am} ထွက်ပြီးနောက် ညနေပိုင်းအတွက် သီးသန့်သုံးသပ်ချက်။` ],
-        isDoubleRisk: false, meta: { analyzedCount: history.length, weights: this.store.aiWeights() }
+        isDoubleRisk: false, meta: { analyzedCount: history.length, weights: this.store.aiWeights(), engineUsed: 'gemini' }
     };
   }
   
@@ -387,7 +400,7 @@ export class EngineService {
     return {
       highConfidence: [], mediumConfidence: [], eliminated: [],
       strongestHead: '-', strongestTail: '-', insights: [message], isDoubleRisk: false,
-      meta: { analyzedCount: 0, weights: this.store.aiWeights() }
+      meta: { analyzedCount: 0, weights: this.store.aiWeights(), engineUsed: 'local' }
     };
   }
 }
