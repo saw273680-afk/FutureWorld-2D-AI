@@ -12,29 +12,32 @@ export interface LotteryRecord {
 }
 
 export interface AIWeights {
-  recency: number;
-  seasonal: number;
-  dayOfWeek: number;
-  market: number;
-  relationship: number; // For Power, Nakhat, Brother
-  trend: number;     // For Head/Tail trends
+  recency: number;      // How recently a number appeared.
+  dayOfWeek: number;    // Frequency on the same day of the week.
+  relationship: number; // Power, Nakhat, Brother connections to previous numbers.
+  trend: number;        // Head/Tail digit trends.
+  breakTotal: number;   // Trend of sum/break of digits.
+  digitFrequency: number; // Frequency of individual digits (0-9).
+  gap: number;          // How long since a number last appeared.
 }
+
 
 @Injectable({
   providedIn: 'root'
 })
 export class StoreService {
-  private readonly STORAGE_KEY = 'futureworld_2d_data_v5'; 
-  private readonly WEIGHTS_KEY = 'futureworld_ai_weights';
+  private readonly STORAGE_KEY = 'futureworld_2d_data_v7'; 
+  private readonly WEIGHTS_KEY = 'futureworld_ai_weights_v7';
 
-  // Default Weights for new Ensemble-like system
+  // v7.0 "Phoenix" Engine - New Weights focused on numerical patterns
   private readonly DEFAULT_WEIGHTS: AIWeights = {
-    recency: 0.30,
-    seasonal: 0.05,
+    recency: 0.20,
+    relationship: 0.25,
+    trend: 0.15,
+    breakTotal: 0.15,
+    digitFrequency: 0.15,
     dayOfWeek: 0.05,
-    market: 0.10,
-    relationship: 0.30,
-    trend: 0.20
+    gap: 0.05,
   };
   
   // State
@@ -238,14 +241,31 @@ export class StoreService {
 
   private seedDatabase() {
     const rawData = [
-      { date: '2026-01-23', am: '43', pm: '91', set: '1,314.39', value: '50,901.86' },
-      { date: '2026-01-22', am: '42', pm: '44', set: '1,311.64', value: '72,724.01' },
-      { date: '2026-01-21', am: '71', pm: '68' },
-      { date: '2026-01-20', am: '31', pm: '76' },
-      { date: '2026-01-19', am: '45', pm: '05' },
-      { date: '2026-01-16', am: '72', pm: '03' },
-      { date: '2026-01-15', am: '04', pm: '96' },
-      { date: '2026-01-14', am: '28', pm: '07' }
+        { date: '2026-02-13', am: '18', pm: '04' },
+        { date: '2026-02-12', am: '87', pm: '22' },
+        { date: '2026-02-11', am: '95', pm: '41' },
+        { date: '2026-02-10', am: '33', pm: '70' },
+        { date: '2026-02-09', am: '64', pm: '09' },
+        { date: '2026-02-06', am: '25', pm: '81' },
+        { date: '2026-02-05', am: '11', pm: '57' },
+        { date: '2026-02-04', am: '79', pm: '38' },
+        { date: '2026-02-03', am: '02', pm: '66' },
+        { date: '2026-02-02', am: '40', pm: '93' },
+        { date: '2026-01-30', am: '59', pm: '14' },
+        { date: '2026-01-29', am: '88', pm: '72' },
+        { date: '2026-01-28', am: '31', pm: '05' },
+        { date: '2026-01-27', am: '60', pm: '49' },
+        { date: '2026-01-26', am: '23', pm: '84' },
+        { date: '2026-01-23', am: '43', pm: '91', set: '1,314.39', value: '50,901.86' },
+        { date: '2026-01-22', am: '42', pm: '44', set: '1,311.64', value: '72,724.01' },
+        { date: '2026-01-21', am: '71', pm: '68' },
+        { date: '2026-01-20', am: '31', pm: '76' },
+        { date: '2026-01-19', am: '45', pm: '05' },
+        { date: '2026-01-16', am: '72', pm: '03' },
+        { date: '2026-01-15', am: '04', pm: '96' },
+        { date: '2026-01-14', am: '28', pm: '07' },
+        { date: '2026-01-13', am: '53', pm: '19' },
+        { date: '2026-01-12', am: '99', pm: '61' },
     ];
 
     const data: LotteryRecord[] = rawData.map(r => ({

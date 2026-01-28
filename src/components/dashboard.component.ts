@@ -1,8 +1,7 @@
 
-import { Component, inject, OnDestroy, OnInit, signal, computed } from '@angular/core';
+import { Component, inject, OnDestroy, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MarketEventService, AppState, TodayResults } from '../services/market-event.service';
-import { PredictionResult } from '../services/engine.service';
+import { MarketEventService } from '../services/market-event.service';
 import { LiveMarketService } from '../services/live-market.service';
 
 @Component({
@@ -15,13 +14,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   marketEventService = inject(MarketEventService);
   liveMarketService = inject(LiveMarketService);
 
-  // Event-driven state
-  appState = this.marketEventService.appState;
-  todayResults = this.marketEventService.todayResults;
+  // The service now only provides the next day's prediction.
   prediction = this.marketEventService.prediction;
-  countdown = this.marketEventService.countdown;
   
-  // Live data state
+  // Live data state for the future desktop app.
   liveMarketData = this.liveMarketService.marketData;
 
   liveDerivedData = computed(() => {
@@ -39,21 +35,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return { set2D, valueModern, isPositive };
   });
 
-
-  pageTitle = computed(() => {
-    switch(this.appState()) {
-      case 'WAITING_FOR_AM':
-        return 'မနက်ပိုင်း ရလဒ်ထွက်ရန် စောင့်ဆိုင်းနေသည်';
-      case 'AM_RESULT_RECEIVED':
-        return 'မနက်ပိုင်း ရလဒ်';
-      case 'WAITING_FOR_PM':
-        return 'ညနေပိုင်း ရလဒ်ထွက်ရန် စောင့်ဆိုင်းနေသည်';
-      case 'PM_RESULT_RECEIVED':
-        return 'ညနေပိုင်း ရလဒ်';
-      case 'MARKET_CLOSED':
-        return 'နောက်တစ်နေ့အတွက် AI ကြိုတင်ခန့်မှန်းချက်';
-    }
-  });
+  pageTitle = 'နောက်တစ်နေ့အတွက် AI ကြိုတင်ခန့်မှန်းချက်';
 
   ngOnInit() {
     this.marketEventService.start();

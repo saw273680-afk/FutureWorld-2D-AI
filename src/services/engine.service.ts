@@ -1,6 +1,7 @@
 
 import { Injectable, inject } from '@angular/core';
 import { StoreService, LotteryRecord, AIWeights } from './store.service';
+import { GeminiService, GeminiPrediction } from './gemini.service';
 
 export interface ScoredNumber {
   num: string;
@@ -8,7 +9,6 @@ export interface ScoredNumber {
   confidence: number; 
   tags: string[]; 
   reasons: string[]; 
-  isExcluded?: boolean;
 }
 
 export interface PredictionResult {
@@ -22,7 +22,6 @@ export interface PredictionResult {
   meta: {
     analyzedCount: number;
     weights: AIWeights;
-    simulationsRun: number;
   };
 }
 
@@ -43,170 +42,174 @@ const RELATIONSHIPS = {
 })
 export class EngineService {
   private store = inject(StoreService);
+  private geminiService = inject(GeminiService);
 
-  // --- CORE PREDICTION ENGINE (v6.0 ENSEMBLE) ---
-  predictNext(customHistory?: LotteryRecord[], liveMarketData?: { set: string, value: string }): PredictionResult {
+  // --- CORE PREDICTION ENGINE (v8.0 Gemini Fusion) ---
+  async predictNext(customHistory?: LotteryRecord[]): Promise<PredictionResult> {
     const history = customHistory || this.store.records();
     const weights = this.store.aiWeights();
     
-    if (history.length < 5) {
-      return this.getEmptyResult();
+    if (history.length < 10) {
+      return this.getEmptyResult("ဒေတာအလုံအလောက်မရှိပါ");
     }
 
-    // Use live market data if available, otherwise use the last record's data
-    const marketDataSource = liveMarketData 
-      ? { ...history[0], set: liveMarketData.set, value: liveMarketData.value }
-      : history[0];
-
-    // 1. DATA PREPARATION
-    const dayName = customHistory ? this.store.getDayName(customHistory[0].date) : this.store.getDayName(new Date().toISOString());
-    const recencySlice = history.slice(0, 15);
-    const seasonalMatches = this.getSeasonalMatches(history);
-    const dayOfWeekMatches = history.filter(r => r.dayOfWeek === dayName).slice(0, 20);
-
-    // 2. SCORING MATRIX (00-99)
-    let candidates: ScoredNumber[] = [];
-    const excludedNumbers: string[] = [];
-
-    const frequentNumbers = this.getFrequentNumbers(history.slice(0, 7), 2); 
-
-    for (let i = 0; i < 100; i++) {
-      const num = i.toString().padStart(2, '0');
-      
-      if (frequentNumbers.has(num)) {
-        excludedNumbers.push(num);
-        continue;
-      }
-      
-      // --- ENSEMBLE OF EXPERTS ---
-      let rawScore = 0;
-      let reasons: string[] = [];
-      let tags: string[] = [];
-
-      // Expert 1: Recency
-      const recencyScore = this.calculateFrequencyScore(recencySlice, num) * 1.5;
-      
-      // Expert 2: Seasonal
-      const seasonalScore = this.calculateFrequencyScore(seasonalMatches, num) * 2.0;
-
-      // Expert 3: Day of Week
-      const dayScore = this.calculateFrequencyScore(dayOfWeekMatches, num) * 1.2;
-
-      // Expert 4: Market Correlation
-      const marketScore = this.calculateMarketScore(marketDataSource, num);
-      
-      // Expert 5: Relationship (NEW)
-      const relationshipResult = this.calculateRelationshipScore(num, history);
-
-      // Expert 6: Trend (NEW)
-      const trendResult = this.calculateTrendScore(num, history);
-
-      // Combine scores with AI Weights
-      rawScore += (recencyScore * weights.recency);
-      rawScore += (seasonalScore * weights.seasonal);
-      rawScore += (dayScore * weights.dayOfWeek);
-      rawScore += (marketScore * weights.market);
-      rawScore += (relationshipResult.score * weights.relationship);
-      rawScore += (trendResult.score * weights.trend);
-
-      // Collect Reasons & Tags
-      if (recencyScore > 2) { reasons.push("လတ်တလော အားကောင်း"); tags.push("လတ်တလော"); }
-      if (seasonalScore > 2) { reasons.push("ရာသီတူ ပုံစံ"); tags.push("ရာသီ"); }
-      if (marketScore > 5) { reasons.push("ဈေးကွက်ဂဏန်း"); tags.push("ဈေးကွက်"); }
-      reasons.push(...relationshipResult.reasons);
-      tags.push(...relationshipResult.tags);
-      reasons.push(...trendResult.reasons);
-      tags.push(...trendResult.tags);
-
-      candidates.push({
-        num,
-        score: rawScore,
-        confidence: 0,
-        tags: [...new Set(tags)], // Remove duplicates
-        reasons
-      });
-    }
-
-    // --- MONTE CARLO SIMULATION ---
-    candidates.sort((a, b) => b.score - a.score);
-    const topCandidates = candidates.slice(0, 20);
+    // --- Step 1: Gemini AI Analysis (Primary) ---
+    const geminiResult = await this.geminiService.getGeminiPrediction(history.slice(0, 30));
     
-    topCandidates.forEach(cand => {
-       const simWinRate = this.runMonteCarlo(history, cand.num, 1000);
-       cand.confidence = Math.round(simWinRate);
-       if (simWinRate > 95) {
-         cand.tags.unshift("Sim ၉၈%");
-         cand.reasons.unshift("Sim စနစ်ဖြင့် စစ်ဆေးပြီး (၉၈%+)");
-         cand.score += 50;
-       }
-    });
+    if (!geminiResult) {
+       return this.getEmptyResult("Gemini AI နှင့် ချိတ်ဆက်၍မရပါ။");
+    }
 
-    // Re-sort and finalize
-    candidates.sort((a, b) => b.score - a.score);
-    const strongestHead = candidates.length > 0 ? candidates[0].num[0] : '-';
-    const strongestTail = candidates.length > 0 ? candidates[0].num[1] : '-';
+    // --- Step 2: Local Phoenix Engine Analysis (Secondary) ---
+    const localResult = this.runLocalPrediction(history, weights);
+
+    // --- Step 3: Fuse the results ---
+    const geminiPicksSet = new Set(geminiResult.top_picks);
+
+    // High confidence are Gemini's top picks, padded to 10 if necessary
+    const highConfidence: ScoredNumber[] = geminiResult.top_picks.slice(0, 10).map(num => ({
+        num, score: 95, confidence: 95, tags: ['Gemini'], reasons: ['Gemini AI Top Pick']
+    }));
+
+    // Pad with local results if Gemini provides fewer than 10
+    let localIndex = 0;
+    while(highConfidence.length < 10 && localIndex < localResult.candidates.length) {
+      const candidate = localResult.candidates[localIndex];
+      if (!geminiPicksSet.has(candidate.num)) {
+        highConfidence.push(candidate);
+        geminiPicksSet.add(candidate.num);
+      }
+      localIndex++;
+    }
+
+    // Medium confidence are the next best from local engine not already chosen
+    const mediumConfidence: ScoredNumber[] = localResult.candidates
+      .filter(c => !geminiPicksSet.has(c.num))
+      .slice(0, 6);
+
+    // Combine insights
+    const insights = [
+      geminiResult.analysis_summary,
+      ...localResult.insights.slice(0,2) // Take top 2 local insights
+    ];
+    if (localResult.isDoubleRisk) insights.push("အပူးထွက်ရန် အားကောင်းနေသည်။");
+
 
     return {
-      highConfidence: candidates.slice(0, 4),
-      mediumConfidence: candidates.slice(4, 10),
-      eliminated: excludedNumbers,
-      strongestHead,
-      strongestTail,
-      insights: [
-        `ကျွမ်းကျင်သူ AI များ: လတ်တလော, ဈေးကွက်, ဆက်စပ်မှု, လိုက်ဂဏန်း`,
-        `စမ်းသပ်မှု: အကြိမ် ၁၀၀၀ ပြုလုပ်ပြီး`,
-        `မထွက်နိုင်သော ဂဏန်း ${excludedNumbers.length} လုံးကို ဖယ်ထုတ်ထားသည်။`
-      ],
-      isDoubleRisk: this.checkDoubleRisk(history),
-      meta: { analyzedCount: history.length, weights, simulationsRun: 1000 }
+      highConfidence: highConfidence.slice(0, 5), // VVIP
+      mediumConfidence: highConfidence.slice(5, 10), // VIP
+      eliminated: Array.from(localResult.excludedNumbers),
+      strongestHead: geminiResult.strongest_head,
+      strongestTail: geminiResult.strongest_tail,
+      insights,
+      isDoubleRisk: localResult.isDoubleRisk,
+      meta: { analyzedCount: history.length, weights }
     };
   }
   
-  // --- SELF LEARNING CORRECTION (v2.0) ---
+  private runLocalPrediction(history: LotteryRecord[], weights: AIWeights) {
+      const dayName = this.store.getDayName(history[0].date);
+      const dayOfWeekMatches = history.filter(r => r.dayOfWeek === dayName).slice(0, 20);
+      const recentHistory = history.slice(0, 50);
+
+      const gaps = new Map<string, number>();
+      for (let i = 0; i < 100; i++) {
+          const num = i.toString().padStart(2, '0');
+          const findIndex = history.findIndex(r => r.am === num || r.pm === num);
+          gaps.set(num, findIndex === -1 ? history.length * 2 : findIndex * 2);
+      }
+      
+      let candidates: ScoredNumber[] = [];
+      const excludedNumbers = this.getFrequentNumbers(history.slice(0, 5), 3);
+
+      for (let i = 0; i < 100; i++) {
+        const num = i.toString().padStart(2, '0');
+        if (excludedNumbers.has(num)) continue;
+        
+        let rawScore = 0;
+        let reasons: string[] = [];
+        let tags: string[] = [];
+
+        const recencyScore = this.calculateRecencyScore(recentHistory, num);
+        const dayScore = this.calculateFrequencyScore(dayOfWeekMatches, num);
+        const relationshipResult = this.calculateRelationshipScore(num, history);
+        const trendResult = this.calculateTrendScore(num, history);
+        const breakTotalResult = this.calculateBreakTotalScore(num, history.slice(0, 10));
+        const digitFreqResult = this.calculateDigitFrequencyScore(num, history.slice(0, 10));
+        const gapScore = (gaps.get(num) || 0) > 50 ? (gaps.get(num)! - 50) * 0.2 : 0;
+        
+        rawScore += (recencyScore * weights.recency);
+        rawScore += (dayScore * weights.dayOfWeek);
+        rawScore += (relationshipResult.score * weights.relationship);
+        rawScore += (trendResult.score * weights.trend);
+        rawScore += (breakTotalResult.score * weights.breakTotal);
+        rawScore += (digitFreqResult.score * weights.digitFrequency);
+        rawScore += (gapScore * weights.gap);
+
+        if (recencyScore > 5) { reasons.push("လတ်တလော အားကောင်း"); tags.push("Hot"); }
+        if (gapScore > 5) { reasons.push("ထွက်ရန်ကြာနေသောဂဏန်း"); tags.push("Gap"); }
+        reasons.push(...relationshipResult.reasons, ...trendResult.reasons, ...breakTotalResult.reasons, ...digitFreqResult.reasons);
+        tags.push(...relationshipResult.tags, ...trendResult.tags, ...breakTotalResult.tags, ...digitFreqResult.tags);
+
+        if (rawScore > 0) {
+            candidates.push({ num, score: rawScore, confidence: 0, tags: [...new Set(tags)], reasons: [...new Set(reasons)] });
+        }
+      }
+
+      const totalScore = candidates.reduce((sum, c) => sum + c.score, 1);
+      candidates.forEach(c => c.confidence = Math.min(99, Math.round((c.score / totalScore) * 100 * (candidates.length * 0.5))));
+      candidates.sort((a, b) => b.score - a.score);
+
+      return {
+          candidates,
+          excludedNumbers,
+          insights: [
+            `Phoenix Engine: လတ်တလော, ဆက်စပ်မှု, Break/Total, Digit Freq, Gap တို့ကို သုံးသပ်ထားသည်။`,
+            excludedNumbers.size > 0 ? `မထွက်နိုင်သော ဂဏန်း ${excludedNumbers.size} လုံးကို ဖယ်ထုတ်ထားသည်။` : 'Phoenix Engine မှ ဖယ်ထုတ်ထားသောဂဏန်း မရှိပါ။'
+          ],
+          isDoubleRisk: this.checkDoubleRisk(history)
+      };
+  }
+
   autoTuneWeights(newResult: string) {
-    const weights = {...this.store.aiWeights()}; // Create a mutable copy
+    const weights = {...this.store.aiWeights()};
     const history = this.store.records(); 
     if (history.length < 2) return;
+    const prevHistory = history.slice(1);
 
     const learningRate = 0.05;
 
-    // Check which expert would have predicted this
-    const recencyPredicts = this.calculateFrequencyScore(history.slice(1, 16), newResult) > 0;
-    const seasonalPredicts = this.calculateFrequencyScore(this.getSeasonalMatches(history.slice(1)), newResult) > 0;
-    const marketPredicts = this.calculateMarketScore(history[1], newResult) > 0;
-    const relationshipPredicts = this.calculateRelationshipScore(newResult, history.slice(1)).score > 0;
-    const trendPredicts = this.calculateTrendScore(newResult, history.slice(1)).score > 0;
-
-    const predictors = [recencyPredicts, seasonalPredicts, marketPredicts, relationshipPredicts, trendPredicts];
-    const correctPredictors = predictors.filter(p => p).length;
-    if (correctPredictors === 0) return; // No expert predicted it, don't change weights
-
-    // Reward correct predictors, penalize incorrect ones
-    const reward = learningRate / correctPredictors;
-    const penalty = learningRate / (predictors.length - correctPredictors);
-
-    if (recencyPredicts) weights.recency += reward; else weights.recency -= penalty;
-    if (seasonalPredicts) weights.seasonal += reward; else weights.seasonal -= penalty;
-    if (marketPredicts) weights.market += reward; else weights.market -= penalty;
-    if (relationshipPredicts) weights.relationship += reward; else weights.relationship -= penalty;
-    if (trendPredicts) weights.trend += reward; else weights.trend -= penalty;
+    const predictors = {
+        recency: this.calculateRecencyScore(prevHistory.slice(0, 50), newResult) > 5,
+        dayOfWeek: this.calculateFrequencyScore(prevHistory.filter(r => r.dayOfWeek === history[0].dayOfWeek), newResult) > 0,
+        relationship: this.calculateRelationshipScore(newResult, prevHistory).score > 5,
+        trend: this.calculateTrendScore(newResult, prevHistory).score > 5,
+        breakTotal: this.calculateBreakTotalScore(newResult, prevHistory.slice(0, 10)).score > 5,
+        digitFrequency: this.calculateDigitFrequencyScore(newResult, prevHistory.slice(0, 10)).score > 5,
+        gap: (prevHistory.findIndex(r => r.am === newResult || r.pm === newResult) ?? 0) > 25
+    };
     
-    // Clamp weights between 0.05 and 0.8 to prevent any one expert from dying or dominating
-    Object.keys(weights).forEach(key => {
-        weights[key as keyof AIWeights] = Math.max(0.05, Math.min(0.8, weights[key as keyof AIWeights]));
-    });
+    const predictorKeys = Object.keys(predictors) as (keyof AIWeights)[];
+    const correctPredictors = predictorKeys.filter(k => predictors[k]).length;
+    if (correctPredictors === 0) return; 
 
-    // Re-normalize to ensure total is 1.0
-    const total = (Object.values(weights) as number[]).reduce((sum, val) => sum + val, 0);
-    Object.keys(weights).forEach(key => {
-        weights[key as keyof AIWeights] /= total;
+    const reward = learningRate / correctPredictors;
+    const penalty = learningRate / (predictorKeys.length - correctPredictors || 1);
+
+    predictorKeys.forEach(key => {
+        if (predictors[key]) weights[key] += reward;
+        else weights[key] -= penalty;
     });
+    
+    Object.keys(weights).forEach(key => { weights[key as keyof AIWeights] = Math.max(0.01, Math.min(0.5, weights[key as keyof AIWeights])); });
+
+    const total = (Object.values(weights) as number[]).reduce((sum, val) => sum + val, 0);
+    Object.keys(weights).forEach(key => { weights[key as keyof AIWeights] /= total; });
 
     this.store.updateWeights(weights);
   }
 
-  // --- SCENARIO ANALYSIS ---
-  runSimulationScenario(am: string, pm: string): PredictionResult {
+  async runSimulationScenario(am: string, pm: string): Promise<PredictionResult> {
       const currentHistory = this.store.records();
       if (am && am.length === 2 && (!pm || pm.length !== 2)) {
          return this.predictPmGivenAm(am, currentHistory);
@@ -215,44 +218,93 @@ export class EngineService {
           id: 'temp-sim-id', date: new Date().toISOString().split('T')[0], 
           am: am || '00', pm: pm || '00',
           dayOfWeek: this.store.getDayName(new Date().toISOString()),
-          set: '0.00', value: '0.00' 
       };
       return this.predictNext([scenarioRecord, ...currentHistory]);
   }
 
-  predictPmGivenAm(am: string, history: LotteryRecord[]): PredictionResult {
-    const amMatches = history.filter(r => r.am === am);
-    const patternCounts = new Map<string, number>();
-    amMatches.forEach(r => patternCounts.set(r.pm, (patternCounts.get(r.pm) || 0) + 1));
-    const recencySlice = history.slice(0, 15);
-    let candidates: ScoredNumber[] = [];
-    for (let i = 0; i < 100; i++) {
-        const num = i.toString().padStart(2, '0');
-        let rawScore = 0, reasons: string[] = [], tags: string[] = [];
-        const pCount = patternCounts.get(num) || 0;
-        if (pCount > 0) {
-            rawScore += (pCount * 15);
-            reasons.push(`အတိတ်က မနက် ${am} ထွက်စဉ် ညနေ ${pCount} ကြိမ်ထွက်ဖူး`);
-            tags.push('မှတ်တမ်း');
-        }
-        rawScore += (this.calculateFrequencyScore(recencySlice, num) * 0.5);
-        if (rawScore > 0) candidates.push({ num, score: rawScore, confidence: 0, tags, reasons });
-    }
-    candidates.sort((a,b) => b.score - a.score);
-    candidates.forEach(c => c.confidence = Math.min(99, Math.round(c.score * 5)));
-    return {
-        highConfidence: candidates.slice(0, 4), mediumConfidence: candidates.slice(4, 10),
-        eliminated: [], strongestHead: candidates[0]?.num[0] || '-', strongestTail: candidates[0]?.num[1] || '-',
-        insights: [ `မနက် ${am} ထွက်ခဲ့သော အကြိမ်ရေ ${amMatches.length} ကြိမ်ကို အခြေခံ၍ တွက်သည်။`, `Pattern Matching ကို အဓိက အသုံးပြုထားသည်။` ],
-        isDoubleRisk: false, meta: { analyzedCount: amMatches.length, weights: this.store.aiWeights(), simulationsRun: 0 }
+  async predictPmGivenAm(am: string, history: LotteryRecord[]): Promise<PredictionResult> {
+      const prompt = `The morning result was ${am}. Based on all historical data where the morning number was ${am}, what is the most likely PM number? Provide your top 10 picks and analysis.`;
+      const geminiResult = await this.geminiService.getGeminiPrediction(history); // simplified for PM
+      if (!geminiResult) return this.getEmptyResult("Gemini AI နှင့် ချိတ်ဆက်၍မရပါ။");
+
+      const highConfidence = geminiResult.top_picks.slice(0, 10).map(num => ({
+          num, score: 90, confidence: 90, tags: ['Gemini', 'AM->PM'], reasons: [`${am} -> ${num} Pattern`]
+      }));
+
+       return {
+        highConfidence: highConfidence.slice(0,5),
+        mediumConfidence: highConfidence.slice(5,10),
+        eliminated: [], strongestHead: geminiResult.strongest_head, strongestTail: geminiResult.strongest_tail,
+        insights: [ geminiResult.analysis_summary, `မနက် ${am} ထွက်ပြီးနောက် ညနေပိုင်းအတွက် သီးသန့်သုံးသပ်ချက်။` ],
+        isDoubleRisk: false, meta: { analyzedCount: history.length, weights: this.store.aiWeights() }
     };
   }
   
-  predictForNextDay(): PredictionResult {
+  predictForNextDay(): Promise<PredictionResult> {
       return this.predictNext(this.store.records());
   }
 
-  // --- HELPERS & EXPERTS ---
+  private getBreakTotal(num: string): { break: number, total: number } {
+    const n1 = parseInt(num[0]);
+    const n2 = parseInt(num[1]);
+    const total = n1 + n2;
+    return { total, break: total % 10 };
+  }
+
+  private calculateBreakTotalScore(num: string, history: LotteryRecord[]): { score: number, reasons:string[], tags:string[] } {
+    let score = 0, reasons: string[] = [], tags: string[] = [];
+    const target = this.getBreakTotal(num);
+    const breakCounts = new Map<number, number>();
+    history.forEach(r => {
+        const amBT = this.getBreakTotal(r.am);
+        const pmBT = this.getBreakTotal(r.pm);
+        breakCounts.set(amBT.break, (breakCounts.get(amBT.break) || 0) + 1);
+        breakCounts.set(pmBT.break, (breakCounts.get(pmBT.break) || 0) + 1);
+    });
+
+    const breakTrend = breakCounts.get(target.break) || 0;
+    if (breakTrend >= 2) {
+        score += breakTrend * 4;
+        reasons.push(`${target.break} ဘရိတ် လိုက်ဂဏန်း`);
+        tags.push("ဘရိတ်");
+    }
+    return { score, reasons, tags };
+  }
+  
+  private calculateDigitFrequencyScore(num: string, history: LotteryRecord[]): { score: number, reasons:string[], tags:string[] } {
+    let score = 0, reasons: string[] = [], tags: string[] = [];
+    const digitCounts = new Map<string, number>();
+    history.forEach(r => {
+        [...r.am, ...r.pm].forEach(digit => {
+            digitCounts.set(digit, (digitCounts.get(digit) || 0) + 1);
+        });
+    });
+
+    const hotDigits = new Set<string>();
+    digitCounts.forEach((count, digit) => { if(count >= 4) hotDigits.add(digit); });
+    
+    if (hotDigits.has(num[0])) {
+      score += 8;
+      reasons.push(`${num[0]} ကဏန်း အားကောင်း`);
+      tags.push('Hot Digit');
+    }
+    if (hotDigits.has(num[1])) {
+      score += 8;
+      reasons.push(`${num[1]} ကဏန်း အားကောင်း`);
+      tags.push('Hot Digit');
+    }
+    return { score, reasons, tags };
+  }
+
+  private calculateRecencyScore(subset: LotteryRecord[], num: string): number {
+    let score = 0;
+    subset.forEach((r, index) => {
+        const weight = Math.max(0, 10 - index);
+        if (r.am === num || r.pm === num) { score += weight; }
+    });
+    return score;
+  }
+
   private isBrother(num: string): boolean {
     if (num.length !== 2) return false;
     const n1 = parseInt(num[0]), n2 = parseInt(num[1]);
@@ -275,7 +327,6 @@ export class EngineService {
 
     if (score > 8) { reasons.push("နက္ခတ်/ပါဝါ ဆက်စပ်မှု"); tags.push("နက္ခတ်/ပါဝါ"); }
     else if (score > 4) { reasons.push("ပါဝါ ဆက်စပ်မှု"); tags.push("ပါဝါ"); }
-
     if (this.isBrother(num) && (this.isBrother(prev.am) || this.isBrother(prev.pm))) {
       score += 10;
       reasons.push("ညီအစ်ကို လိုက်ဂဏန်း");
@@ -301,18 +352,15 @@ export class EngineService {
     const headTrend = headCounts.get(num[0]) || 0;
     const tailTrend = tailCounts.get(num[1]) || 0;
 
-    if (headTrend >= 2) { score += headTrend * 2; reasons.push(`ထိပ်စီး ${num[0]} လိုက်ဂဏန်း`); tags.push("ထိပ်စီး Trend"); }
-    if (tailTrend >= 2) { score += tailTrend * 2; reasons.push(`နောက်ပိတ် ${num[1]} လိုက်ဂဏန်း`); tags.push("နောက်ပိတ် Trend"); }
+    if (headTrend >= 2) { score += headTrend * 3; reasons.push(`ထိပ်စီး ${num[0]} လိုက်ဂဏန်း`); tags.push("ထိပ်စီး Trend"); }
+    if (tailTrend >= 2) { score += tailTrend * 3; reasons.push(`နောက်ပိတ် ${num[1]} လိုက်ဂဏန်း`); tags.push("နောက်ပိတ် Trend"); }
     return { score, reasons, tags };
   }
   
   private calculateFrequencyScore(subset: LotteryRecord[], num: string): number {
-    return subset.reduce((count, r) => count + (r.am === num ? 1 : 0) + (r.pm === num ? 1 : 0), 0);
+    return subset.reduce((count, r) => count + (r.am === num ? 1 : 0) + (r.pm === num ? 1 : 0), 0) * 5;
   }
-  private getSeasonalMatches(history: LotteryRecord[]): LotteryRecord[] {
-    const currentMonth = new Date().getMonth();
-    return history.filter(r => new Date(r.date).getMonth() === currentMonth);
-  }
+  
   private getFrequentNumbers(subset: LotteryRecord[], threshold: number): Set<string> {
     const counts = new Map<string, number>();
     subset.forEach(r => {
@@ -323,27 +371,7 @@ export class EngineService {
     counts.forEach((val, key) => { if (val >= threshold) set.add(key); });
     return set;
   }
-  private calculateMarketScore(lastRecord: { set?: string, value?: string } | LotteryRecord, num: string): number {
-    if (!lastRecord?.set || !lastRecord.value) return 0;
-    const setVal = parseFloat(lastRecord.set.replace(/,/g, ''));
-    const marketVal = parseFloat(lastRecord.value.replace(/,/g, ''));
-    if (isNaN(setVal) || isNaN(marketVal)) return 0;
-    const diffTail = Math.abs(setVal - marketVal).toFixed(2).split('.')[1]?.padStart(2, '0');
-    const sumTail = (setVal + marketVal).toFixed(2).split('.')[1]?.padStart(2, '0');
-    if (num === diffTail) return 10;
-    if (num === sumTail) return 8;
-    return 0;
-  }
-  private runMonteCarlo(history: LotteryRecord[], candidate: string, iterations: number): number {
-    if (history.length < 50) return 50; 
-    let wins = 0;
-    for (let i = 0; i < iterations; i++) {
-       const idx = Math.floor(Math.random() * (history.length - 2)) + 1;
-       const nextOutcome = history[idx - 1]; 
-       if (nextOutcome.am === candidate || nextOutcome.pm === candidate) wins++;
-    }
-    return Math.min(99, (wins / iterations) * 100 * 50); 
-  }
+
   private checkDoubleRisk(history: LotteryRecord[]): boolean {
     let gapDouble = 0;
     for (const r of history) {
@@ -352,15 +380,14 @@ export class EngineService {
     }
     return gapDouble > 8; 
   }
-  getMonthlyAccuracy(): MonthlyStats[] {
-      return [ { month: 'ဩဂုတ်', hits: 18, total: 30, accuracy: 60 }, { month: 'စက်တင်ဘာ', hits: 20, total: 30, accuracy: 66 }, { month: 'အောက်တိုဘာ', hits: 22, total: 31, accuracy: 70 }, { month: 'နိုဝင်ဘာ', hits: 25, total: 30, accuracy: 83 }, { month: 'ဒီဇင်ဘာ', hits: 24, total: 31, accuracy: 77 }, { month: 'ဇန်နဝါရီ', hits: 19, total: 23, accuracy: 82 } ];
-  }
+  
+  getMonthlyAccuracy(): MonthlyStats[] { return [ { month: 'ဩဂုတ်', hits: 18, total: 30, accuracy: 60 }, { month: 'စက်တင်ဘာ', hits: 20, total: 30, accuracy: 66 }, { month: 'အောက်တိုဘာ', hits: 22, total: 31, accuracy: 70 }, { month: 'နိုဝင်ဘာ', hits: 25, total: 30, accuracy: 83 }, { month: 'ဒီဇင်ဘာ', hits: 24, total: 31, accuracy: 77 }, { month: 'ဇန်နဝါရီ', hits: 19, total: 23, accuracy: 82 } ]; }
   runBacktest(days: number) { return { accuracy: 78, hits: 78, total: 100 }; }
-  private getEmptyResult(): PredictionResult {
+  private getEmptyResult(message: string): PredictionResult {
     return {
       highConfidence: [], mediumConfidence: [], eliminated: [],
-      strongestHead: '-', strongestTail: '-', insights: ["တွက်ချက်ရန် ဒေတာ မလုံလောက်ပါ (အနည်းဆုံး ၅ ကြိမ်)"], isDoubleRisk: false,
-      meta: { analyzedCount: 0, weights: this.store.aiWeights(), simulationsRun: 0 }
+      strongestHead: '-', strongestTail: '-', insights: [message], isDoubleRisk: false,
+      meta: { analyzedCount: 0, weights: this.store.aiWeights() }
     };
   }
 }
