@@ -149,10 +149,13 @@
            </h3>
            
            @if (gemini.isAnalyzing()) {
-              <div class="flex flex-col items-center justify-center p-8 space-y-3">
+              <div class="flex flex-col items-center justify-center p-8 space-y-4">
                  <div class="w-10 h-10 border-4 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
-                 <p class="text-purple-300 text-sm font-medium animate-pulse">Google Search ဖြင့် ရှာဖွေသုံးသပ်နေပါသည်...</p>
-                 <p class="text-xs text-slate-500">ဤလုပ်ဆောင်ချက်သည် စက္ကန့် ၃၀ အထိ ကြာနိုင်ပါသည်။</p>
+                 <p class="text-purple-300 text-sm font-medium text-center">{{ loadingMessage() }}</p>
+                 <p class="text-xs text-slate-500">ဤလုပ်ဆောင်ချက်သည် ခေတ္တကြာမြင့်နိုင်ပါသည်</p>
+                 <button (click)="cancelAnalysis()" class="mt-2 bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800 rounded-lg transition-colors text-sm font-medium px-4 py-2">
+                   ပယ်ဖျက်မည်
+                 </button>
               </div>
            } @else if (gemini.analysisError(); as error) {
               <div class="bg-red-900/20 border border-red-800 rounded-lg p-4 text-center">

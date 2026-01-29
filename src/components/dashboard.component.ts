@@ -1,5 +1,5 @@
 
-import { Component, inject, signal, OnInit, effect } from '@angular/core';
+import { Component, inject, signal, OnInit, effect, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { StoreService } from '../services/store.service';
@@ -15,7 +15,7 @@ declare var marked: any;
   imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './dashboard.component.html'
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   store = inject(StoreService);
   engine = inject(EngineService);
   gemini = inject(GeminiService);
@@ -26,6 +26,8 @@ export class DashboardComponent implements OnInit {
   // Signals
   prediction = signal<PredictionResult | null>(null);
   isRefined = signal(false);
+  loadingMessage = signal('AI နှင့် ဆက်သွယ်နေပါသည်...');
+  private loadingInterval: any = null;
   
   entryForm = this.fb.group({
     date: [this.todayStr, Validators.required],
@@ -40,10 +42,22 @@ export class DashboardComponent implements OnInit {
         this._refinePrediction();
       }
     });
+
+    effect(() => {
+      if (this.gemini.isAnalyzing()) {
+        this.startLoadingMessages();
+      } else {
+        this.stopLoadingMessages();
+      }
+    });
   }
 
   ngOnInit() {
     this.prediction.set(this.engine.predictNext());
+  }
+  
+  ngOnDestroy() {
+    this.stopLoadingMessages();
   }
 
   onSubmit() {
@@ -58,12 +72,40 @@ export class DashboardComponent implements OnInit {
         this.prediction.set(this.engine.predictNext());
         this.isRefined.set(false);
         this.gemini.analysisResult.set(null);
+        this.gemini.analysisError.set(null);
       }
     }
   }
 
   analyzeWithGemini() {
     this.gemini.getAnalysis(this.store.records());
+  }
+
+  cancelAnalysis() {
+    this.gemini.cancelAnalysis();
+  }
+
+  private startLoadingMessages() {
+    const messages = [
+      'Google Search ဖြင့် ဒေတာရှာဖွေနေပါသည်...',
+      'Trends များကို သုံးသပ်နေပါသည်...',
+      'AI မော်ဒယ်မှ အဖြေကို စီစဉ်နေပါသည်...',
+      'ခေတ္တစောင့်ဆိုင်းပေးပါ။ ချိတ်ဆက်မှု အနည်းငယ်ကြာနေပါသည်။'
+    ];
+    let index = 0;
+    this.loadingMessage.set(messages[index]);
+
+    this.loadingInterval = setInterval(() => {
+      index = (index + 1) % messages.length;
+      this.loadingMessage.set(messages[index]);
+    }, 7000); // Change message every 7 seconds
+  }
+
+  private stopLoadingMessages() {
+    if (this.loadingInterval) {
+      clearInterval(this.loadingInterval);
+      this.loadingInterval = null;
+    }
   }
 
   private _refinePrediction() {

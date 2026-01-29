@@ -15,6 +15,7 @@ export interface AnalysisResult {
 export class GeminiService {
   private store = inject(StoreService);
   private ai: GoogleGenAI | null = null;
+  private analysisController = new AbortController();
   
   // Signals for Dashboard Analysis
   isAnalyzing = signal(false);
@@ -41,6 +42,10 @@ export class GeminiService {
       }
     });
   }
+  
+  cancelAnalysis() {
+    this.analysisController.abort();
+  }
 
   async getAnalysis(history: LotteryRecord[]) {
     if (!this.ai) {
@@ -51,6 +56,7 @@ export class GeminiService {
     this.isAnalyzing.set(true);
     this.analysisResult.set(null);
     this.analysisError.set(null);
+    this.analysisController = new AbortController();
 
     const historyText = history.slice(0, 30).map(r => `${r.date}: ${r.am}, ${r.pm}`).join('\n');
     const prompt = `You are a helpful AI assistant and an expert analyst for Myanmar's 2D lottery.
@@ -85,11 +91,17 @@ export class GeminiService {
     });
     
     const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error("Request timed out")), 40000) // 40 seconds timeout
+        setTimeout(() => reject(new Error("Request timed out")), 25000) // Reduced to 25 seconds
     );
+    
+    const cancellationPromise = new Promise<never>((_, reject) => {
+        this.analysisController.signal.addEventListener('abort', () => {
+            reject(new Error("Request cancelled by user"));
+        });
+    });
 
     try {
-      const response = await Promise.race([apiCall, timeoutPromise]);
+      const response = await Promise.race([apiCall, timeoutPromise, cancellationPromise]);
       
       const responseText = response.text;
 
@@ -126,6 +138,8 @@ export class GeminiService {
           this.analysisError.set('AI server မှ အချိန်မီတုံ့ပြန်မှုမရပါ။ Network ကိုစစ်ဆေးပြီး နောက်တစ်ကြိမ် ထပ်ကြိုးစားကြည့်ပါ။');
       } else if (e.message.includes('API key not valid')) {
           this.analysisError.set('သင်၏ API Key မမှန်ကန်ပါ။ Settings တွင် ပြန်လည်စစ်ဆေးပါ။');
+      } else if (e.message === "Request cancelled by user") {
+          this.analysisError.set('သုံးသပ်မှုကို ပယ်ဖျက်လိုက်ပါသည်။');
       } else {
           this.analysisError.set('AI နှင့် ချိတ်ဆက်ရာတွင် အမှားအယွင်း ဖြစ်ပေါ်ပါသည်။');
       }
@@ -154,7 +168,7 @@ export class GeminiService {
       
       const streamPromise = chat.sendMessageStream({ message: prompt });
       const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Stream start timed out')), 15000) // 15 seconds to start stream
+          setTimeout(() => reject(new Error('Stream start timed out')), 10000) // Reduced to 10 seconds
       );
 
       return Promise.race([streamPromise, timeoutPromise]);
