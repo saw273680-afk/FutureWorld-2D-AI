@@ -76,14 +76,20 @@ export class GeminiService {
       ${historyText}
     `;
 
+    const apiCall = this.ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+            tools: [{googleSearch: {}}],
+        },
+    });
+    
+    const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error("Request timed out")), 40000) // 40 seconds timeout
+    );
+
     try {
-        const response = await this.ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-            config: {
-                tools: [{googleSearch: {}}],
-            },
-        });
+      const response = await Promise.race([apiCall, timeoutPromise]);
       
       const responseText = response.text;
 
@@ -116,7 +122,9 @@ export class GeminiService {
 
     } catch (e: any) {
       console.error(e);
-      if (e.message.includes('API key not valid')) {
+      if (e.message === "Request timed out") {
+          this.analysisError.set('AI server မှ အချိန်မီတုံ့ပြန်မှုမရပါ။ Network ကိုစစ်ဆေးပြီး နောက်တစ်ကြိမ် ထပ်ကြိုးစားကြည့်ပါ။');
+      } else if (e.message.includes('API key not valid')) {
           this.analysisError.set('သင်၏ API Key မမှန်ကန်ပါ။ Settings တွင် ပြန်လည်စစ်ဆေးပါ။');
       } else {
           this.analysisError.set('AI နှင့် ချိတ်ဆက်ရာတွင် အမှားအယွင်း ဖြစ်ပေါ်ပါသည်။');
@@ -143,7 +151,13 @@ export class GeminiService {
       if (!this.ai) {
           throw new Error("API Key not set.");
       }
-      return chat.sendMessageStream({ message: prompt });
+      
+      const streamPromise = chat.sendMessageStream({ message: prompt });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Stream start timed out')), 15000) // 15 seconds to start stream
+      );
+
+      return Promise.race([streamPromise, timeoutPromise]);
   }
 
 }

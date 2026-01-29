@@ -122,13 +122,24 @@ export class ChatComponent implements OnInit, AfterViewChecked {
         this.needsScroll = true;
       }
 
-    } catch(e) {
+    } catch(e: any) {
       console.error(e);
-      this.messages.update(m => [...m, { role: 'model', content: "တောင်းပန်ပါသည်။ AI နှင့်ချိတ်ဆက်ရာတွင် အမှားအယွင်းဖြစ်သွားပါသည်။" }]);
+      let errorMessage = "တောင်းပန်ပါသည်။ AI နှင့်ချိတ်ဆက်ရာတွင် အမှားအယွင်းဖြစ်သွားပါသည်။";
+      if (e.message === 'Stream start timed out') {
+        errorMessage = "AI Chat server နှင့် ချိတ်ဆက်ရန် အချိန်ကြာနေပါသည်။ ကျေးဇူးပြု၍ Network ကိုစစ်ဆေးပြီး ထပ်မံကြိုးစားပါ။";
+      }
+      this.messages.update(m => {
+          // Remove the empty, streaming placeholder message
+          const updatedMessages = m.filter(msg => !(msg.isStreaming && msg.content === ''));
+          // Add a new message with the error
+          return [...updatedMessages, { role: 'model', content: errorMessage, isStreaming: false }];
+      });
     } finally {
        this.messages.update(currentMessages => {
           const lastMessage = currentMessages[currentMessages.length - 1];
-          if(lastMessage) lastMessage.isStreaming = false;
+          if(lastMessage?.isStreaming) {
+            lastMessage.isStreaming = false;
+          }
           return [...currentMessages];
         });
       this.isLoading.set(false);
