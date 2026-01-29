@@ -1,101 +1,213 @@
 
-<div class="max-w-md mx-auto space-y-4">
-  
-  <!-- Prompt to add API Key -->
-  @if (!geminiService.hasApiKey()) {
-    <div class="bg-yellow-900/30 border border-yellow-700 text-yellow-200 text-sm rounded-lg p-3 flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in duration-500">
-      <div class="flex items-start sm:items-center gap-2">
-        <svg class="w-5 h-5 flex-shrink-0 mt-0.5 sm:mt-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
-        <span>Gemini AI ချိတ်ဆက်မထားပါ။</span>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      
+      <!-- Prediction Card -->
+      <div class="lg:col-span-2 space-y-6">
+        <!-- Main AI Card -->
+        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 shadow-2xl">
+           <div class="p-6 md:p-8 relative z-10">
+              
+              <!-- VVIP Hot Number Display -->
+              <div class="flex flex-col items-center justify-center mb-8">
+                <div class="text-yellow-400 text-sm font-bold uppercase tracking-widest mb-2">VVIP Hot Number</div>
+                @if (prediction().highConfidence.length > 0) {
+                  <div class="relative w-48 h-48 flex items-center justify-center animate-hot-number">
+                    <!-- Glow effect -->
+                    <div class="absolute inset-0 bg-yellow-400 rounded-full blur-2xl opacity-30"></div>
+                    <!-- Circle -->
+                    <div class="absolute inset-0 bg-slate-900/50 rounded-full border-4 border-yellow-400"></div>
+                    <!-- Number -->
+                    <span class="relative text-8xl font-black text-yellow-300" style="text-shadow: 0 0 15px rgba(250, 204, 21, 0.5);">
+                      {{ prediction().highConfidence[0].num }}
+                    </span>
+                  </div>
+                } @else {
+                  <div class="relative w-48 h-48 flex items-center justify-center">
+                     <div class="absolute inset-0 bg-slate-800 rounded-full border-2 border-dashed border-slate-600"></div>
+                     <span class="relative text-6xl font-black text-slate-700">--</span>
+                  </div>
+                }
+                <div class="mt-4 text-xs text-slate-400">
+                  နောက်ဆုံး Update: {{ liveMarketData().lastUpdated }}
+                </div>
+              </div>
+
+              <div class="flex flex-col md:flex-row justify-between items-start mb-6 gap-4 border-t border-slate-700 pt-6">
+                <div>
+                   <h2 class="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                     AI တွက်ချက်မှု စနစ် (v8.0 Hot)
+                   </h2>
+                   <div class="flex items-center gap-3 text-xs text-slate-400">
+                     <span class="bg-slate-700 px-2 py-1 rounded text-cyan-400 flex items-center gap-1.5">
+                       <span class="w-2 h-2 rounded-full" [class]="liveMarketData().isLive ? 'bg-green-400 animate-pulse' : 'bg-red-500'"></span>
+                       {{ liveMarketData().isLive ? 'Live' : 'Offline' }}
+                     </span>
+                     <span class="bg-slate-700 px-2 py-1 rounded text-cyan-400">Sim: ဖွင့်ထားသည်</span>
+                   </div>
+                </div>
+                <button (click)="printVoucher()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all no-print">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                  ဘောင်ချာ ထုတ်ရန်
+                </button>
+              </div>
+
+              <!-- VVIP 10 Numbers -->
+              <div class="mb-8">
+                <div class="text-cyan-400 text-sm font-semibold uppercase tracking-wider mb-4 flex items-center gap-2">
+                   AI အကြံပြုချက် (VVIP ၁၀ ကွက်)
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  @for (item of prediction().highConfidence; track item.num; let i = $index) {
+                    <div class="relative group">
+                      <div class="rounded-xl p-4 text-center transform transition group-hover:-translate-y-1 shadow-lg"
+                           [class]="i === 0 ? 'bg-cyan-600 shadow-cyan-900/50 border-2 border-cyan-400' : 'bg-slate-700'">
+                        <span class="text-4xl font-black text-white block">{{ item.num }}</span>
+                      </div>
+                    </div>
+                  }
+                   @for (item of prediction().mediumConfidence; track item.num; let i = $index) {
+                    <div class="relative group">
+                      <div class="bg-slate-700 rounded-xl p-4 text-center transform transition group-hover:-translate-y-1 shadow-lg">
+                        <span class="text-4xl font-bold text-slate-200 block">{{ item.num }}</span>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Insights & Eliminated -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-600">
+                    <h3 class="text-white font-bold mb-2 text-xs uppercase text-green-400">AI Expert ဦးစားပေးမှုများ</h3>
+                    <div class="space-y-2 text-xs text-slate-300">
+                        <div class="flex justify-between">
+                            <span>လတ်တလော (Recency):</span>
+                            <span>{{ (prediction().meta.weights.recency * 100).toFixed(0) }}%</span>
+                        </div>
+                         <div class="flex justify-between">
+                            <span>ဆက်စပ်မှု (Relationship):</span>
+                            <span class="font-bold text-green-300">{{ (prediction().meta.weights.relationship * 100).toFixed(0) }}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>လိုက်ဂဏန်း (Trend):</span>
+                             <span class="font-bold text-green-300">{{ (prediction().meta.weights.trend * 100).toFixed(0) }}%</span>
+                        </div>
+                        <div class="flex justify-between text-slate-400">
+                            <span>ဈေးကွက် (Market):</span>
+                            <span>{{ (prediction().meta.weights.market * 100).toFixed(0) }}%</span>
+                        </div>
+                         <div class="flex justify-between text-slate-400">
+                            <span>ရာသီခွင် (Seasonal):</span>
+                            <span>{{ (prediction().meta.weights.seasonal * 100).toFixed(0) }}%</span>
+                        </div>
+                    </div>
+                  </div>
+
+                  <div class="bg-red-900/20 rounded-xl p-4 border border-red-900/50">
+                     <h3 class="text-white font-bold mb-2 text-xs uppercase text-red-400">ဖယ်ထုတ်ထားသော ဂဏန်းများ</h3>
+                     <div class="flex flex-wrap gap-2 min-h-[40px] items-center">
+                        @if (prediction().eliminated.length > 0) {
+                            @for (num of prediction().eliminated.slice(0, 8); track num) {
+                                <span class="text-red-300 text-xs font-mono line-through bg-red-900/40 px-1 rounded">{{ num }}</span>
+                            }
+                        } @else {
+                            <span class="text-slate-500 text-xs italic">
+                                ယခုရက်ပိုင်းအတွင်း အကြိမ်ရေများသော ဂဏန်းမရှိပါ။
+                            </span>
+                        }
+                     </div>
+                  </div>
+              </div>
+
+           </div>
+        </div>
       </div>
-       <button (click)="goToSettings()" class="bg-yellow-600/20 hover:bg-yellow-600/40 text-white font-bold py-1 px-3 rounded-lg transition-colors whitespace-nowrap text-xs">
-        Key ထည့်ရန်
-      </button>
-    </div>
-  }
 
-  <!-- Main Live Display -->
-  <div class="text-center p-4 bg-slate-800 rounded-xl border border-slate-700 shadow-xl">
-    <div class="flex justify-between items-center">
-        <h2 class="text-xl font-bold text-cyan-400/50">V'IP 2D</h2>
-        @if(liveMarketData().isLive) {
-            <div class="flex items-center gap-2 text-xs text-green-400">
-                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                LIVE
-            </div>
-        }
-    </div>
-    <div class="text-9xl font-black text-yellow-400 drop-shadow-[0_5px_15px_rgba(250,204,21,0.4)] my-2">
-      {{ liveDerivedData().set2D }}
-    </div>
-    <p class="text-xs text-slate-500 font-mono">
-        {{ liveMarketData().lastUpdated ? 'Updated: ' + liveMarketData().lastUpdated : 'Fetching data...' }}
-    </p>
-    @if (liveMarketData().error) {
-      <p class="text-xs text-yellow-500 mt-2 font-mono animate-pulse">{{ liveMarketData().error }}</p>
-    }
-  </div>
+      <!-- Right Column: Entry & Stats -->
+      <div class="lg:col-span-1 space-y-6">
+        <!-- Live Market Data -->
+        <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl">
+           <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-3">
+             <span class="w-3 h-3 rounded-full" [class]="liveMarketData().isLive ? 'bg-green-400 animate-pulse' : 'bg-red-500'"></span>
+             Live ဈေးကွက် အခြေအနေ
+           </h3>
+           <div class="space-y-4">
+             <div>
+               <label class="block text-xs font-medium text-cyan-400 mb-1">SET Index</label>
+               <div class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-cyan-300 text-2xl font-mono font-bold tracking-widest text-center">
+                 {{ liveMarketData().set }}
+               </div>
+             </div>
+             <div>
+               <label class="block text-xs font-medium text-purple-400 mb-1">Market Value</label>
+               <div class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-purple-300 text-2xl font-mono font-bold tracking-widest text-center">
+                 {{ liveMarketData().value }}
+               </div>
+             </div>
+           </div>
+           <div class="text-center text-xs text-slate-500 mt-4">
+              နောက်ဆုံး Update: {{ liveMarketData().lastUpdated }}
+           </div>
+        </div>
 
-  <!-- SET and VALUE cards -->
-  <div class="grid grid-cols-2 gap-4">
-    <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center">
-      <p class="text-xs text-slate-400">SET</p>
-      <p class="text-2xl font-bold font-mono" [class]="liveDerivedData().isPositive ? 'text-green-400' : 'text-red-400'">{{ liveMarketData().set }}</p>
-    </div>
-    <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center">
-      <p class="text-xs text-slate-400">VALUE</p>
-      <p class="text-2xl font-bold font-mono text-slate-300">{{ liveDerivedData().valueModern }}</p>
-    </div>
-  </div>
-
-  <!-- AM/PM Result cards -->
-  <div class="grid grid-cols-2 gap-4">
-    <div class="bg-slate-800 p-3 rounded-xl border border-slate-700">
-      <p class="text-center text-sm font-bold text-slate-300 mb-2">12:01 PM</p>
-      <p class="text-center text-5xl font-bold text-cyan-400">{{ displayRecord().am }}</p>
-      <div class="flex justify-between text-xs text-slate-500 font-mono mt-2 pt-2 border-t border-slate-700">
-        <span>SET: {{ displayRecord().set }}</span>
+        <!-- Entry Form -->
+        <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl">
+           <h3 class="text-xl font-bold text-white mb-2">ရလဒ် အသစ်သွင်းရန်</h3>
+           <p class="text-xs text-slate-400 mb-4">ရလဒ်သွင်းပြီးတိုင်း AI သည် အလိုအလျောက် ပိုမိုឆ្លပ်မြက်လာပါမည်။</p>
+           
+           <form [formGroup]="entryForm" (ngSubmit)="onSubmit()" class="space-y-4">
+             <div class="grid grid-cols-2 gap-2">
+                <div>
+                   <label class="block text-xs font-medium text-slate-400 mb-1">မနက် (၁၂:၀၀)</label>
+                   <input formControlName="am" maxlength="2" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-center font-bold">
+                </div>
+                <div>
+                   <label class="block text-xs font-medium text-slate-400 mb-1">ညနေ (၄:၃၀)</label>
+                   <input formControlName="pm" maxlength="2" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-center font-bold">
+                </div>
+             </div>
+             <button type="submit" [disabled]="entryForm.invalid" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 rounded transition-colors disabled:opacity-50 shadow-lg shadow-cyan-600/30">
+               မှတ်တမ်းတင်မည်
+             </button>
+           </form>
+        </div>
       </div>
     </div>
-    <div class="bg-slate-800 p-3 rounded-xl border border-slate-700">
-      <p class="text-center text-sm font-bold text-slate-300 mb-2">4:30 PM</p>
-      <p class="text-center text-5xl font-bold text-purple-400">{{ displayRecord().pm }}</p>
-       <div class="flex justify-between text-xs text-slate-500 font-mono mt-2 pt-2 border-t border-slate-700">
-        <span>&nbsp;</span>
+
+    <!-- Hidden POS Voucher for Print -->
+    <div id="printable-voucher">
+      <div class="text-center border-b-2 border-black pb-2 mb-2">
+         <h1 class="text-xl font-bold">FutureWorld 2D</h1>
+         <p class="text-sm">VVIP ခန့်မှန်းချက်</p>
+         <p class="text-xs mt-1">{{ todayStr }} | {{ liveMarketData().lastUpdated }}</p>
+      </div>
+
+      <div class="mb-2">
+        <p class="text-xs font-bold uppercase mb-1 text-center">VVIP Hot Number</p>
+        <div class="text-center font-black text-5xl p-2 border-2 border-black rounded-lg">
+           {{ prediction().highConfidence.length > 0 ? prediction().highConfidence[0].num : '--' }}
+        </div>
+      </div>
+      
+      <div class="mb-4">
+        <p class="text-xs font-bold uppercase mb-1 border-b border-black">VVIP ၁၀ ကွက်</p>
+        <div class="grid grid-cols-5 gap-1 mt-2 justify-center">
+           @for (item of prediction().highConfidence; track item.num) {
+             <span class="text-lg font-black border border-black rounded p-1 text-center">{{ item.num }}</span>
+           }
+            @for (item of prediction().mediumConfidence; track item.num) {
+             <span class="text-lg font-bold border border-black rounded p-1 text-center">{{ item.num }}</span>
+           }
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <p class="text-xs font-bold uppercase mb-1 border-b border-black">Live Market Data</p>
+        <p class="text-[10px]">SET: {{ liveMarketData().set }} | Value: {{ liveMarketData().value }}</p>
+      </div>
+
+      <div class="text-center text-xs border-t-2 border-black pt-2">
+         <p>ကံကောင်းပါစေ</p>
+         <p class="text-[10px] mt-1">FW-AI v8.0 Hot</p>
       </div>
     </div>
-  </div>
-
-  <!-- Modern/Internet/TW Prediction Table -->
-  <div class="bg-slate-800 rounded-xl border border-slate-700">
-    @if(prediction(); as pred) {
-      <table class="w-full text-center">
-        <thead>
-          <tr class="text-slate-400 text-sm">
-            <th class="p-2">AI</th>
-            <th class="p-2 font-medium">Modern</th>
-            <th class="p-2 font-medium">Internet</th>
-            <th class="p-2 font-medium">TW</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="border-t border-slate-700">
-            <td class="p-2 text-xs text-slate-400">9:30 AM</td>
-            <td class="p-2 text-xl font-bold">{{ pred.highConfidence[0]?.num || '--' }}</td>
-            <td class="p-2 text-xl font-bold">{{ pred.highConfidence[1]?.num || '--' }}</td>
-            <td class="p-2 text-xl font-bold">{{ pred.highConfidence[2]?.num || '--' }}</td>
-          </tr>
-          <tr class="border-t border-slate-700">
-            <td class="p-2 text-xs text-slate-400">2:00 PM</td>
-            <td class="p-2 text-xl font-bold">{{ pred.highConfidence[3]?.num || '--' }}</td>
-            <td class="p-2 text-xl font-bold">{{ pred.highConfidence[4]?.num || '--' }}</td>
-            <td class="p-2 text-xl font-bold">{{ pred.mediumConfidence[0]?.num || '--' }}</td>
-          </tr>
-        </tbody>
-      </table>
-    } @else {
-        <div class="p-4 text-center text-xs text-slate-500">AI predictions loading...</div>
-    }
-  </div>
-
-</div>

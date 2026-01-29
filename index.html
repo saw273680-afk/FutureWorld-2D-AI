@@ -52,32 +52,36 @@
           display: none !important;
         }
       }
+
+      /* VVIP Hot Number Animation */
+      @keyframes hot-number-shake {
+        0%, 100% { transform: translateX(0) rotate(0); }
+        10%, 30%, 50%, 70%, 90% { transform: translateX(-2px) rotate(-1deg); }
+        20%, 40%, 60%, 80% { transform: translateX(2px) rotate(1deg); }
+      }
+      .animate-hot-number {
+        animation: hot-number-shake 1.5s cubic-bezier(.36,.07,.19,.97) infinite;
+      }
     </style>
   <script type="importmap">
 {
   "imports": {
-    "rxjs": "https://cdn.jsdelivr.net/npm/rxjs@7.8.1/dist/esm/index.js",
-    "rxjs/operators": "https://cdn.jsdelivr.net/npm/rxjs@7.8.1/dist/esm/operators/index.js",
-    "rxjs/ajax": "https://cdn.jsdelivr.net/npm/rxjs@7.8.1/dist/esm/ajax/index.js",
-    "rxjs/webSocket": "https://cdn.jsdelivr.net/npm/rxjs@7.8.1/dist/esm/webSocket/index.js",
-    "rxjs/testing": "https://cdn.jsdelivr.net/npm/rxjs@7.8.1/dist/esm/testing/index.js",
-    "rxjs/fetch": "https://cdn.jsdelivr.net/npm/rxjs@7.8.1/dist/esm/fetch/index.js",
-    "@google/genai": "https://cdn.jsdelivr.net/npm/@google/genai@0.14.0/dist/index.mjs",
-    "@angular/platform-browser": "https://cdn.jsdelivr.net/npm/@angular/platform-browser@18.0.0/fesm2022/platform-browser.mjs",
-    "@angular/compiler": "https://cdn.jsdelivr.net/npm/@angular/compiler@18.0.0/fesm2022/compiler.mjs",
-    "@angular/core": "https://cdn.jsdelivr.net/npm/@angular/core@18.0.0/fesm2022/core.mjs",
-    "@angular/core/primitives/signals": "https://cdn.jsdelivr.net/npm/@angular/core@18.0.0/fesm2022/primitives/signals.mjs",
-    "@angular/core/primitives/event-dispatch": "https://cdn.jsdelivr.net/npm/@angular/core@18.0.0/fesm2022/primitives/event-dispatch.mjs",
-    "@angular/common": "https://cdn.jsdelivr.net/npm/@angular/common@18.0.0/fesm2022/common.mjs",
-    "@angular/common/http": "https://cdn.jsdelivr.net/npm/@angular/common@18.0.0/fesm2022/http.mjs",
-    "@angular/forms": "https://cdn.jsdelivr.net/npm/@angular/forms@18.0.0/fesm2022/forms.mjs",
-    "tslib": "https://cdn.jsdelivr.net/npm/tslib@2.6.3/tslib.es6.mjs"
+    "rxjs": "https://esm.sh/rxjs@^7.8.2?conditions=es2015",
+    "rxjs/operators": "https://esm.sh/rxjs@^7.8.2/operators?conditions=es2015",
+    "rxjs/ajax": "https://esm.sh/rxjs@^7.8.2/ajax?conditions=es2015",
+    "rxjs/webSocket": "https://esm.sh/rxjs@^7.8.2/webSocket?conditions=es2015",
+    "rxjs/testing": "https://esm.sh/rxjs@^7.8.2/testing?conditions=es2015",
+    "rxjs/fetch": "https://esm.sh/rxjs@^7.8.2/fetch?conditions=es2015",
+    "@angular/platform-browser": "https://esm.sh/@angular/platform-browser@^21.1.1?external=rxjs",
+    "@angular/compiler": "https://esm.sh/@angular/compiler@^21.1.1?external=rxjs",
+    "@angular/core": "https://esm.sh/@angular/core@^21.1.1?external=rxjs",
+    "@angular/common": "https://esm.sh/@angular/common@^21.1.1?external=rxjs",
+    "@angular/forms": "https://esm.sh/@angular/forms@^21.1.1?external=rxjs"
   }
 }
 </script>
 </head>
   <body>
     <app-root></app-root>
-    <script type="module" src="index.tsx"></script>
   </body>
 </html>

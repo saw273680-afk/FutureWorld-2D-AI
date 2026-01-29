@@ -89,7 +89,7 @@ import { EngineService, PredictionResult } from '../services/engine.service';
             </div>
 
             <!-- Top Suggestions (High Confidence) -->
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                @for (item of res.highConfidence; track item.num) {
                  <div class="relative group">
                     <div class="rounded-xl p-4 text-center transform transition group-hover:-translate-y-1 shadow-lg border"
@@ -192,14 +192,15 @@ export class SimulationComponent {
     return validAm && validPm && hasData;
   }
 
-  async simulate() {
+  simulate() {
     if (this.isValidInput()) {
        this.hasSearched.set(true);
        this.result.set(null); 
-       
-       // The engine call is now async, so we await it
-       const res = await this.engine.runSimulationScenario(this.amInput, this.pmInput);
-       this.result.set(res);
+
+       setTimeout(() => {
+         const res = this.engine.runSimulationScenario(this.amInput, this.pmInput);
+         this.result.set(res);
+       }, 800);
     }
   }
 }

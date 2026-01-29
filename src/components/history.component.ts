@@ -1,81 +1,35 @@
 
 import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
 import { StoreService } from '../services/store.service';
-import { EngineService } from '../services/engine.service';
 
 @Component({
   selector: 'app-history',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="space-y-6">
       
       <!-- Action Bar -->
       <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 flex flex-col md:flex-row gap-4 items-center justify-between shadow-lg">
         <div>
-           <h2 class="text-xl font-bold text-white">ထွက်ဂဏန်း မှတ်တမ်းများ</h2>
+           <h2 class="text-xl font-bold text-white">ထွက်ဂဏန်း မှတ်တမ်းဟောင်းများ</h2>
            <p class="text-slate-400 text-sm">စုစုပေါင်း: <span class="text-cyan-400 font-mono">{{ store.totalRecords() }}</span> ကြိမ်</p>
         </div>
         <div class="flex flex-wrap gap-3 justify-center">
-           <button (click)="showAddForm.set(!showAddForm())" class="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors text-sm font-bold shadow-lg shadow-green-600/20">
-             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-             {{ showAddForm() ? 'ဖောင်ပိတ်မည်' : 'မှတ်တမ်းဟောင်းထည့်ရန်' }}
+           <button (click)="showImport.set(!showImport())" class="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition-colors text-sm font-bold shadow-lg shadow-cyan-600/20">
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+             {{ showImport() ? 'ပိတ်မည်' : 'ဒေတာ အများလိုက်ထည့်ရန်' }}
            </button>
-           <button (click)="showImport.set(!showImport())" class="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition-colors text-sm font-medium">
-             {{ showImport() ? 'Import ပိတ်မည်' : 'ဒေတာ အများလိုက်ထည့်ရန်' }}
+           <button (click)="downloadCSV()" class="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors text-sm font-medium">
+             CSV ထုတ်ရန်
            </button>
            <button (click)="clearAll()" class="flex items-center gap-2 px-4 py-2 bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800 rounded-lg transition-colors text-sm font-medium">
              အားလုံးဖျက်မည်
            </button>
         </div>
       </div>
-      
-      <!-- Info Box for Automation -->
-      <div class="bg-blue-900/30 border border-blue-700 text-blue-200 text-sm rounded-lg p-4 flex items-start gap-3">
-         <svg class="w-5 h-5 flex-shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>
-         <span>
-         <strong>မှတ်ချက်:</strong> နေ့စဉ်ထွက်ဂဏန်းများကို စနစ်မှ အလိုအလျောက် မှတ်တမ်းတင်ပေးပါသည်။ ဤဖောင်ကို မှတ်တမ်းဟောင်းများ ပြန်ထည့်ရန် သို့မဟုတ် ပြင်ဆင်ရန်အတွက်သာ အသုံးပြုပါ။
-         </span>
-      </div>
-
-      <!-- Add New Record Form -->
-      @if (showAddForm()) {
-        <div class="bg-slate-800 rounded-xl p-6 border border-green-500/50 shadow-xl animate-in slide-in-from-top-4 duration-300">
-           <h3 class="text-xl font-bold text-white mb-2">မှတ်တမ်းဟောင်း အသစ်သွင်းရန်</h3>
-           <p class="text-xs text-slate-400 mb-4">ရလဒ်သွင်းပြီးတိုင်း AI သည် အလိုအလျောက် ပိုမိုឆ្លပ်မြက်လာပါမည်။</p>
-           
-           <form [formGroup]="entryForm" (ngSubmit)="onSubmit()" class="space-y-4 max-w-md mx-auto">
-             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div>
-                  <label class="block text-xs font-medium text-slate-400 mb-1">နေ့စွဲ</label>
-                  <input type="date" formControlName="date" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white font-bold">
-               </div>
-                <div>
-                   <label class="block text-xs font-medium text-slate-400 mb-1">SET/Value (Optional)</label>
-                   <div class="flex gap-2">
-                     <input formControlName="set" placeholder="SET" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-center font-bold">
-                     <input formControlName="value" placeholder="Value" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-center font-bold">
-                   </div>
-                </div>
-             </div>
-             <div class="grid grid-cols-2 gap-4">
-                <div>
-                   <label class="block text-xs font-medium text-slate-400 mb-1">မနက်</label>
-                   <input formControlName="am" maxlength="2" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-center font-bold text-xl">
-                </div>
-                <div>
-                   <label class="block text-xs font-medium text-slate-400 mb-1">ညနေ</label>
-                   <input formControlName="pm" maxlength="2" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-center font-bold text-xl">
-                </div>
-             </div>
-             <button type="submit" [disabled]="entryForm.invalid" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition-colors disabled:opacity-50 shadow-lg shadow-green-600/30">
-               မှတ်တမ်းတင်မည်
-             </button>
-           </form>
-        </div>
-      }
 
       <!-- Import Section -->
       @if (showImport()) {
@@ -169,24 +123,11 @@ import { EngineService } from '../services/engine.service';
 })
 export class HistoryComponent {
   store = inject(StoreService);
-  engine = inject(EngineService);
-  private fb = inject(FormBuilder);
-
   currentPage = signal(0);
   pageSize = 15;
-  todayStr = new Date().toISOString().split('T')[0];
-
+  
   showImport = signal(false);
-  showAddForm = signal(false);
   importText = '';
-
-  entryForm = this.fb.group({
-    date: [this.todayStr, Validators.required],
-    am: ['', [Validators.required, Validators.pattern(/^[0-9]{2}$/)]],
-    pm: ['', [Validators.required, Validators.pattern(/^[0-9]{2}$/)]],
-    set: [''],
-    value: ['']
-  });
 
   totalPages = computed(() => Math.ceil(this.store.records().length / this.pageSize));
   
@@ -194,19 +135,6 @@ export class HistoryComponent {
     const start = this.currentPage() * this.pageSize;
     return this.store.records().slice(start, start + this.pageSize);
   });
-
-  onSubmit() {
-    if (this.entryForm.valid) {
-      const { date, am, pm, set, value } = this.entryForm.value;
-      if (date && am && pm) {
-        this.engine.autoTuneWeights(am); 
-        this.store.addRecord(date, am, pm, set || undefined, value || undefined);
-        this.engine.autoTuneWeights(pm);
-        this.entryForm.reset({ date: this.todayStr, am: '', pm: '', set: '', value: '' });
-        this.showAddForm.set(false);
-      }
-    }
-  }
 
   processImport() {
     const { count, errors } = this.store.importBulk(this.importText);

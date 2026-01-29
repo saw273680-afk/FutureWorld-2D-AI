@@ -1,79 +1,73 @@
 
-import { Component, inject, OnDestroy, OnInit, computed } from '@angular/core';
+import { Component, inject, signal, OnDestroy, OnInit, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MarketEventService } from '../services/market-event.service';
-import { LiveMarketService } from '../services/live-market.service';
-import { GeminiService } from '../services/gemini.service';
-import { AppComponent } from '../app.component';
+import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { StoreService } from '../services/store.service';
+import { EngineService, PredictionResult } from '../services/engine.service';
+import { MarketDataService } from '../services/market-data.service';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './dashboard.component.html'
 })
 export class DashboardComponent implements OnInit, OnDestroy {
-  marketEventService = inject(MarketEventService);
-  liveMarketService = inject(LiveMarketService);
-  geminiService = inject(GeminiService);
-  app = inject(AppComponent);
   store = inject(StoreService);
+  engine = inject(EngineService);
+  marketDataService = inject(MarketDataService);
+  private fb: FormBuilder = inject(FormBuilder);
 
-  prediction = this.marketEventService.prediction;
-  liveMarketData = this.liveMarketService.marketData;
+  todayStr = new Date().toISOString().split('T')[0];
+  
+  // Signals
+  prediction = signal<PredictionResult>(this.engine.predictNext());
+  liveMarketData = this.marketDataService.marketData;
 
-  liveDerivedData = computed(() => {
-    const data = this.liveMarketData();
-    if (!data.isLive || data.set === '----.--') {
-      return { set2D: '--', valueModern: '--', isPositive: true };
-    }
-    const set = data.set.replace(/,/g, '');
-    const parts = set.split('.');
-    const set2D = parts.length < 2 || parts[0].length < 1 || parts[1].length < 1 ? '--' : `${parts[0].slice(-1)}${parts[1].slice(0, 1)}`;
-    const valueNum = parseFloat(data.value.replace(/,/g, ''));
-    const valueModern = isNaN(valueNum) ? '--' : `${(valueNum / 1_000_000).toFixed(2)}M`;
-    const isPositive = !data.set.startsWith('-');
-
-    return { set2D, valueModern, isPositive };
+  entryForm = this.fb.group({
+    date: [this.todayStr, Validators.required],
+    am: ['', [Validators.required, Validators.pattern(/^[0-9]{2}$/)]],
+    pm: ['', [Validators.required, Validators.pattern(/^[0-9]{2}$/)]],
+    set: [''],
+    value: ['']
   });
 
-  displayRecord = computed(() => {
-    const latest = this.store.latestRecord();
-    if (!latest) {
-      return { am: '--', pm: '--', set: '----.--', value: '---,---.--' };
-    }
-    
-    const todayStr = new Date().toISOString().split('T')[0];
-    const now = new Date();
-    
-    let pmValue = latest.pm;
-    // If the latest record is for today, hide the PM value until after 4:30 PM market close
-    if (latest.date === todayStr) {
-      const isAfterClose = now.getHours() > 16 || (now.getHours() === 16 && now.getMinutes() >= 30);
-      if (!isAfterClose) {
-        pmValue = '--';
+  constructor() {
+    effect(() => {
+      const marketData = this.liveMarketData();
+      if (marketData.isLive) {
+        const newPrediction = this.engine.predictNext(undefined, {
+          set: marketData.set,
+          value: marketData.value
+        });
+        this.prediction.set(newPrediction);
       }
-    }
-
-    return {
-      am: latest.am,
-      pm: pmValue,
-      set: latest.set || '----.--',
-      value: latest.value || '---,---.--'
-    };
-  });
-
+    });
+  }
 
   ngOnInit() {
-    this.marketEventService.start();
+    this.marketDataService.startMonitoring();
   }
 
   ngOnDestroy() {
-    this.marketEventService.stop();
+    this.marketDataService.stopMonitoring();
   }
-  
-  goToSettings() {
-    this.app.currentView.set('settings');
+
+  onSubmit() {
+    if (this.entryForm.valid) {
+      const { date, am, pm, set, value } = this.entryForm.value;
+      if (date && am && pm) {
+        this.engine.autoTuneWeights(am); 
+        this.store.addRecord(date, am, pm, set || undefined, value || undefined);
+        this.engine.autoTuneWeights(pm);
+        this.entryForm.reset({ date: this.todayStr, am: '', pm: '', set: '', value: '' });
+        // After submitting, recalculate with the latest static data
+        this.prediction.set(this.engine.predictNext());
+      }
+    }
+  }
+
+  printVoucher() {
+    window.print();
   }
 }
