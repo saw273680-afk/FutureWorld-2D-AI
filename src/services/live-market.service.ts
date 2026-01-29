@@ -13,7 +13,7 @@ export interface MarketData {
  * --- အရေးကြီးသော မှတ်ချက် ---
  * ဤ Service သည် SET Thailand API မှ တိုက်ရိုက် Live Data ရယူရန် ရေးသားထားပါသည်။
  * Web Browser ပေါ်တွင် တိုက်ရိုက်အသုံးပြုပါက CORS (Cross-Origin Resource Sharing) Error များကြောင့် မူလ API ကို တိုက်ရိုက်ခေါ်ယူ၍မရပါ။
- * ထို့ကြောင့်၊ ဤ Error ကို ကျော်လွှားနိုင်ရန် Public CORS Proxy (`corsproxy.io`) ကို ကြားခံအဖြစ် အသုံးပြုထားပါသည်။
+ * ထို့ကြောင့်၊ ဤ Error ကို ကျော်လွှားနိုင်ရန် Public CORS Proxy (`api.allorigins.win`) ကို ကြားခံအဖြစ် အသုံးပြုထားပါသည်။
  * ၎င်းသည် feature ကို အမှန်တကယ် အလုပ်လုပ်စေရန် ပြသနိုင်သော်လည်း၊ Public Proxy များသည် အမြဲတမ်း တည်ငြိမ်မှုမရှိနိုင်ပါ။
  * အကယ်၍ Live Data ရပ်တန့်သွားပါက Proxy ဝန်ဆောင်မှု ယာယီရပ်ဆိုင်းခြင်းကြောင့် ဖြစ်နိုင်ပါသည်။
  */
@@ -22,8 +22,8 @@ export interface MarketData {
 })
 export class LiveMarketService {
   private timer: any;
-  // Use a public CORS proxy to bypass browser security restrictions.
-  private readonly PROXY_URL = 'https://corsproxy.io/?';
+  // Switched to a different public CORS proxy for better reliability.
+  private readonly PROXY_URL = 'https://api.allorigins.win/raw?url=';
   private readonly API_ENDPOINT = 'https://www.set.or.th/api/market/index/SET/quote';
   private readonly TARGET_URL = this.PROXY_URL + encodeURIComponent(this.API_ENDPOINT);
 
