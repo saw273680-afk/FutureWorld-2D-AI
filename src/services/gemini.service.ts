@@ -82,25 +82,25 @@ export class GeminiService {
       ${historyText}
     `;
 
-    const apiCall = this.ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-            tools: [{googleSearch: {}}],
-        },
-    });
-    
-    const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error("Request timed out")), 25000) // Reduced to 25 seconds
-    );
-    
-    const cancellationPromise = new Promise<never>((_, reject) => {
-        this.analysisController.signal.addEventListener('abort', () => {
-            reject(new Error("Request cancelled by user"));
-        });
-    });
-
     try {
+      const apiCall = this.ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+          config: {
+              tools: [{googleSearch: {}}],
+          },
+      });
+      
+      const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error("Request timed out")), 40000) // Increased to 40 seconds for stability
+      );
+      
+      const cancellationPromise = new Promise<never>((_, reject) => {
+          this.analysisController.signal.addEventListener('abort', () => {
+              reject(new Error("Request cancelled by user"));
+          });
+      });
+
       const response = await Promise.race([apiCall, timeoutPromise, cancellationPromise]);
       
       const responseText = response.text;
@@ -168,7 +168,7 @@ export class GeminiService {
       
       const streamPromise = chat.sendMessageStream({ message: prompt });
       const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Stream start timed out')), 10000) // Reduced to 10 seconds
+          setTimeout(() => reject(new Error('Stream start timed out')), 15000) // Increased to 15 seconds
       );
 
       return Promise.race([streamPromise, timeoutPromise]);
