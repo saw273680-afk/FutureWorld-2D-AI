@@ -1,10 +1,13 @@
 
-import { Component, inject, signal, OnDestroy, OnInit, effect } from '@angular/core';
+import { Component, inject, signal, OnInit, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { StoreService } from '../services/store.service';
-import { EngineService, PredictionResult } from '../services/engine.service';
-import { MarketDataService } from '../services/market-data.service';
+import { EngineService, PredictionResult, ScoredNumber } from '../services/engine.service';
+import { GeminiService } from '../services/gemini.service';
+
+// Allow using the 'marked' library for markdown rendering
+declare var marked: any;
 
 @Component({
   selector: 'app-dashboard',
@@ -12,59 +15,108 @@ import { MarketDataService } from '../services/market-data.service';
   imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './dashboard.component.html'
 })
-export class DashboardComponent implements OnInit, OnDestroy {
+export class DashboardComponent implements OnInit {
   store = inject(StoreService);
   engine = inject(EngineService);
-  marketDataService = inject(MarketDataService);
+  gemini = inject(GeminiService);
   private fb: FormBuilder = inject(FormBuilder);
 
   todayStr = new Date().toISOString().split('T')[0];
   
   // Signals
-  prediction = signal<PredictionResult>(this.engine.predictNext());
-  liveMarketData = this.marketDataService.marketData;
-
+  prediction = signal<PredictionResult | null>(null);
+  isRefined = signal(false);
+  
   entryForm = this.fb.group({
     date: [this.todayStr, Validators.required],
     am: ['', [Validators.required, Validators.pattern(/^[0-9]{2}$/)]],
     pm: ['', [Validators.required, Validators.pattern(/^[0-9]{2}$/)]],
-    set: [''],
-    value: ['']
   });
 
   constructor() {
     effect(() => {
-      const marketData = this.liveMarketData();
-      if (marketData.isLive) {
-        const newPrediction = this.engine.predictNext(undefined, {
-          set: marketData.set,
-          value: marketData.value
-        });
-        this.prediction.set(newPrediction);
+      const result = this.gemini.analysisResult();
+      if (result && result.recommendedNumbers.length > 0) {
+        this._refinePrediction();
       }
     });
   }
 
   ngOnInit() {
-    this.marketDataService.startMonitoring();
-  }
-
-  ngOnDestroy() {
-    this.marketDataService.stopMonitoring();
+    this.prediction.set(this.engine.predictNext());
   }
 
   onSubmit() {
     if (this.entryForm.valid) {
-      const { date, am, pm, set, value } = this.entryForm.value;
+      const { date, am, pm } = this.entryForm.value;
       if (date && am && pm) {
         this.engine.autoTuneWeights(am); 
-        this.store.addRecord(date, am, pm, set || undefined, value || undefined);
+        this.store.addRecord(date, am, pm);
         this.engine.autoTuneWeights(pm);
-        this.entryForm.reset({ date: this.todayStr, am: '', pm: '', set: '', value: '' });
-        // After submitting, recalculate with the latest static data
+        this.entryForm.reset({ date: this.todayStr, am: '', pm: '' });
+        // After submitting, recalculate and reset refined state
         this.prediction.set(this.engine.predictNext());
+        this.isRefined.set(false);
+        this.gemini.analysisResult.set(null);
       }
     }
+  }
+
+  analyzeWithGemini() {
+    this.gemini.getAnalysis(this.store.records());
+  }
+
+  private _refinePrediction() {
+    const localPrediction = this.prediction();
+    const geminiResult = this.gemini.analysisResult();
+
+    if (!localPrediction || !geminiResult) return;
+
+    const localNumbers = localPrediction.highConfidence.map(n => n.num);
+    const geminiNumbers = geminiResult.recommendedNumbers;
+
+    // Create a combined list with priority
+    const combined = [
+      ...geminiNumbers.filter(n => localNumbers.includes(n)), // Intersection first
+      ...geminiNumbers.filter(n => !localNumbers.includes(n)), // Then remaining Gemini
+      ...localNumbers.filter(n => !geminiNumbers.includes(n)) // Then remaining local
+    ];
+    
+    const uniqueTop10 = [...new Set(combined)].slice(0, 10);
+    
+    // Create new ScoredNumber array
+    const newScored: ScoredNumber[] = uniqueTop10.map(num => {
+      const existing = localPrediction.highConfidence.find(s => s.num === num) || localPrediction.mediumConfidence.find(s => s.num === num);
+      if (existing) {
+        return { ...existing, score: existing.score + 20, confidence: Math.min(99, existing.confidence + 15) }; // Boost score
+      }
+      return { num, score: 100, confidence: 80, tags: ['Gemini'], reasons: ['Gemini AI အကြံပြုချက်'] };
+    });
+
+    // Sort again by score
+    newScored.sort((a,b) => b.score - a.score);
+
+    const refinedPrediction: PredictionResult = {
+      ...localPrediction,
+      highConfidence: newScored.slice(0, 4),
+      mediumConfidence: newScored.slice(4, 10),
+      strongestHead: newScored.length > 0 ? newScored[0].num[0] : localPrediction.strongestHead,
+      strongestTail: newScored.length > 0 ? newScored[0].num[1] : localPrediction.strongestTail,
+      insights: [
+        `Gemini AI ၏သုံးသပ်ချက်ဖြင့် ပေါင်းစပ်ထားသည်။`,
+        ...localPrediction.insights
+      ]
+    };
+
+    this.prediction.set(refinedPrediction);
+    this.isRefined.set(true);
+  }
+
+  parseMarkdown(content: string | null | undefined): string {
+    if (!content) return '';
+    // Remove the recommendation block before rendering
+    const cleanContent = content.replace(/RECOMMENDED_NUMBERS_START[\s\S]*?RECOMMENDED_NUMBERS_END/, '');
+    return marked.parse(cleanContent);
   }
 
   printVoucher() {

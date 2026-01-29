@@ -14,11 +14,17 @@
         </div>
         
         <!-- Responsive Nav -->
-        <div class="flex space-x-1 md:space-x-4 overflow-x-auto">
+        <div class="flex items-center space-x-1 md:space-x-2 overflow-x-auto">
           <button (click)="currentView.set('dashboard')" 
             class="px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap"
             [class]="currentView() === 'dashboard' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
             ပင်မစာမျက်နှာ
+          </button>
+           <button (click)="currentView.set('chat')" 
+            class="px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-1"
+            [class]="currentView() === 'chat' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+            AI Chat
+            <span class="px-1.5 py-0.5 text-[9px] font-bold bg-yellow-400 text-slate-900 rounded-full">အသစ်</span>
           </button>
           <button (click)="currentView.set('simulation')" 
             class="px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap"
@@ -34,6 +40,11 @@
             class="px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap"
             [class]="currentView() === 'backtest' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
             တိကျမှုစစ်ဆေးရန်
+          </button>
+          <button (click)="currentView.set('settings')"
+            class="px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap"
+            [class]="currentView() === 'settings' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+            Settings
           </button>
         </div>
       </div>
@@ -55,11 +66,17 @@
       @case ('simulation') {
         <app-simulation />
       }
+      @case ('chat') {
+        <app-chat />
+      }
+      @case ('settings') {
+        <app-settings />
+      }
     }
   </main>
   
   <!-- Footer -->
   <footer class="border-t border-slate-800 mt-12 py-8 text-center text-slate-500 text-sm">
-    <p>© ၂၀၂၄ FutureWorld 2D ဉာဏ်တုစနစ်များ။ ပညာရေးအတွက်သာ ရည်ရွယ်သည်။</p>
+    <p>အနာဂတ်ကမ္ဘာမှကိုယ်တိုင်ဖန်တီးသည်</p>
   </footer>
 </div>

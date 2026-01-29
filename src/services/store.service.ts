@@ -6,8 +6,6 @@ export interface LotteryRecord {
   date: string; // ISO string YYYY-MM-DD
   am: string;   // "00" to "99"
   pm: string;   // "00" to "99"
-  set?: string; // Market Set Index
-  value?: string; // Market Value
   dayOfWeek: string;
 }
 
@@ -15,7 +13,6 @@ export interface AIWeights {
   recency: number;
   seasonal: number;
   dayOfWeek: number;
-  market: number;
   relationship: number; // For Power, Nakhat, Brother
   trend: number;     // For Head/Tail trends
 }
@@ -24,22 +21,23 @@ export interface AIWeights {
   providedIn: 'root'
 })
 export class StoreService {
-  private readonly STORAGE_KEY = 'futureworld_2d_data_v5'; 
-  private readonly WEIGHTS_KEY = 'futureworld_ai_weights';
+  private readonly STORAGE_KEY = 'futureworld_2d_data_v6'; 
+  private readonly WEIGHTS_KEY = 'futureworld_ai_weights_v6';
+  private readonly API_KEY_KEY = 'futureworld_gemini_api_key';
 
-  // Default Weights for new Ensemble-like system
+  // Rebalanced weights after removing the 'market' expert.
   private readonly DEFAULT_WEIGHTS: AIWeights = {
     recency: 0.30,
+    relationship: 0.35,
+    trend: 0.25,
     seasonal: 0.05,
     dayOfWeek: 0.05,
-    market: 0.10,
-    relationship: 0.30,
-    trend: 0.20
   };
   
   // State
   records = signal<LotteryRecord[]>([]);
   aiWeights = signal<AIWeights>(this.DEFAULT_WEIGHTS);
+  apiKey = signal<string>('');
 
   // Computed
   latestRecord = computed(() => this.records().length > 0 ? this.records()[0] : null);
@@ -48,6 +46,22 @@ export class StoreService {
   constructor() {
     this.loadData();
     this.loadWeights();
+    this.loadApiKey();
+  }
+  
+  private _generateId(): string {
+    // A simple, universally compatible unique ID generator to prevent crashes.
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+
+  private loadApiKey() {
+    const key = localStorage.getItem(this.API_KEY_KEY);
+    this.apiKey.set(key || '');
+  }
+
+  updateApiKey(key: string) {
+    this.apiKey.set(key);
+    localStorage.setItem(this.API_KEY_KEY, key);
   }
 
   private loadData() {
@@ -70,11 +84,15 @@ export class StoreService {
     if (stored) {
       try {
         const loadedWeights = JSON.parse(stored);
-        // Ensure new properties exist
-        this.aiWeights.set({...this.DEFAULT_WEIGHTS, ...loadedWeights});
+        // Ensure new properties exist and old ones (market) are removed
+        const cleanWeights = { ...this.DEFAULT_WEIGHTS, ...loadedWeights };
+        delete (cleanWeights as any).market; // Safely remove old property if it exists
+        this.aiWeights.set(cleanWeights);
       } catch {
         this.aiWeights.set(this.DEFAULT_WEIGHTS);
       }
+    } else {
+      this.aiWeights.set(this.DEFAULT_WEIGHTS);
     }
   }
 
@@ -83,16 +101,14 @@ export class StoreService {
     localStorage.setItem(this.WEIGHTS_KEY, JSON.stringify(newWeights));
   }
 
-  addRecord(date: string, am: string, pm: string, set?: string, value?: string) {
+  addRecord(date: string, am: string, pm: string) {
     this.records.update(prev => {
       const existingIndex = prev.findIndex(r => r.date === date);
       const newRecord: LotteryRecord = {
-        id: existingIndex >= 0 ? prev[existingIndex].id : crypto.randomUUID(),
+        id: existingIndex >= 0 ? prev[existingIndex].id : this._generateId(),
         date,
         am,
         pm,
-        set,
-        value,
         dayOfWeek: this.getDayName(date)
       };
 
@@ -110,92 +126,75 @@ export class StoreService {
     });
   }
 
-  importBulk(text: string): { count: number, errors: number } {
-    // 1. Pre-cleaning
-    const cleanText = text.replace(/[^\x00-\x7F\n]/g, "") 
-                          .replace(/\r\n/g, "\n");
-
+  parseImportData(text: string): { successful: {date: string, am: string, pm: string}[], errors: string[] } {
+    const cleanText = text.replace(/[^\x00-\x7F\n]/g, "").replace(/\r\n/g, "\n");
     const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l);
-    let count = 0;
-    let errors = 0;
+    const errors: string[] = [];
     const newRecordsMap = new Map<string, Partial<LotteryRecord>>();
 
-    // Regex Definitions
     const isDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) || /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/.test(s);
     const isTime = (s: string) => /^\d{1,2}:\d{2}\s*(?:AM|PM)?|00:00$/.test(s);
-    const isSetLabel = (s: string) => s.toLowerCase() === 'set';
-    const isValueLabel = (s: string) => s.toLowerCase() === 'value';
-    const is2DLabel = (s: string) => s.toUpperCase() === '2D';
-    const isNumber = (s: string) => /^\d{1,3}(?:,\d{3})*(?:\.\d+)?$/.test(s); 
     const is2DResult = (s: string) => /^\d{2}$/.test(s);
 
     let currentDate: string | null = null;
     let lastTime: string | null = null;
-    let pendingSet: string | null = null;
-    let pendingValue: string | null = null;
+    let currentLineNumber = 0;
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
+    for (const line of lines) {
+        currentLineNumber++;
+        if (!line) continue;
 
-      if (isDate(line)) {
-        currentDate = this.parseDate(line);
-        if (currentDate) {
-           if (!newRecordsMap.has(currentDate)) {
-             newRecordsMap.set(currentDate, { date: currentDate });
-           }
-        } else {
-          errors++;
+        if (isDate(line)) {
+            currentDate = this.parseDate(line);
+            if (currentDate) {
+                if (!newRecordsMap.has(currentDate)) newRecordsMap.set(currentDate, { date: currentDate });
+            } else {
+                errors.push(`Line ${currentLineNumber}: "${line}" - နေ့စွဲပုံစံ မမှန်ပါ။`);
+            }
+            lastTime = null; // Reset time on new date
+            continue;
         }
-        continue;
-      }
 
-      if (isTime(line)) {
-        lastTime = line;
-        continue;
-      }
-
-      if (isSetLabel(line) && lines[i+1] && isNumber(lines[i+1])) {
-        pendingSet = lines[i+1];
-        i++; 
-        continue;
-      }
-      if (isValueLabel(line) && lines[i+1] && isNumber(lines[i+1])) {
-        pendingValue = lines[i+1];
-        i++; 
-        continue;
-      }
-
-      if (is2DLabel(line)) continue;
-      
-      if (is2DResult(line)) {
-        if (currentDate && lastTime) {
-          const rec = newRecordsMap.get(currentDate)!;
-          if (lastTime.includes('11:00') || lastTime.includes('12:00') || lastTime.includes('00:00')) {
-             if (!rec.am || lastTime.includes('00:00')) rec.am = line;
-             if (pendingSet) rec.set = pendingSet;
-             if (pendingValue) rec.value = pendingValue;
-          } else {
-             if (!rec.pm) rec.pm = line;
-             if (pendingSet) rec.set = pendingSet;
-             if (pendingValue) rec.value = pendingValue;
-          }
+        if (isTime(line)) {
+            lastTime = line;
+            continue;
         }
-        pendingSet = null;
-        pendingValue = null;
-      }
+
+        if (is2DResult(line)) {
+            if (currentDate) {
+                const rec = newRecordsMap.get(currentDate)!;
+                if (lastTime) {
+                    if (lastTime.includes('11:00') || lastTime.includes('12:00') || lastTime.includes('00:00')) {
+                        rec.am = line;
+                    } else {
+                        rec.pm = line;
+                    }
+                } else {
+                    // If no time is specified, assume AM then PM
+                    if (!rec.am) rec.am = line;
+                    else if (!rec.pm) rec.pm = line;
+                }
+            } else {
+                 errors.push(`Line ${currentLineNumber}: "${line}" - ဂဏန်းတွေ့သော်လည်း နေ့စွဲသတ်မှတ်မထားပါ။`);
+            }
+            continue;
+        }
+        
+        errors.push(`Line ${currentLineNumber}: "${line}" - အချက်အလက် နားမလည်ပါ။`);
     }
-
-    newRecordsMap.forEach((rec) => {
-      if (rec.date && rec.am && rec.pm) {
-        this.addRecord(rec.date, rec.am, rec.pm, rec.set, rec.value);
-        count++;
-      } else {
-        errors++;
-      }
+    
+    const successful: {date: string, am: string, pm: string}[] = [];
+    newRecordsMap.forEach((rec, key) => {
+        if (rec.date && rec.am && rec.pm) {
+            successful.push({ date: rec.date, am: rec.am, pm: rec.pm });
+        } else {
+            errors.push(`Date ${key}: မနက် သို့မဟုတ် ညနေဂဏန်း မပြည့်စုံပါ။`);
+        }
     });
 
-    return { count, errors };
+    return { successful, errors };
   }
+
 
   deleteRecord(id: string) {
     this.records.update(prev => {
@@ -238,8 +237,8 @@ export class StoreService {
 
   private seedDatabase() {
     const rawData = [
-      { date: '2026-01-23', am: '43', pm: '91', set: '1,314.39', value: '50,901.86' },
-      { date: '2026-01-22', am: '42', pm: '44', set: '1,311.64', value: '72,724.01' },
+      { date: '2026-01-23', am: '43', pm: '91' },
+      { date: '2026-01-22', am: '42', pm: '44' },
       { date: '2026-01-21', am: '71', pm: '68' },
       { date: '2026-01-20', am: '31', pm: '76' },
       { date: '2026-01-19', am: '45', pm: '05' },
@@ -249,12 +248,10 @@ export class StoreService {
     ];
 
     const data: LotteryRecord[] = rawData.map(r => ({
-      id: crypto.randomUUID(),
+      id: this._generateId(),
       date: r.date,
       am: r.am,
       pm: r.pm,
-      set: r.set,
-      value: r.value,
       dayOfWeek: this.getDayName(r.date)
     }));
     

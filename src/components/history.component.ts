@@ -34,23 +34,68 @@ import { StoreService } from '../services/store.service';
       <!-- Import Section -->
       @if (showImport()) {
         <div class="bg-slate-800 rounded-xl p-6 border border-cyan-500/50 shadow-xl animate-in slide-in-from-top-4 duration-300">
-          <h3 class="text-lg font-bold text-white mb-2">အများလိုက် ထည့်သွင်းခြင်း (အလိုအလျောက် သန့်စင်စနစ်)</h3>
-          <p class="text-sm text-slate-400 mb-4">
-             ဒေတာများကို ဤနေရာတွင် Paste ချပါ။ (နေ့စွဲပုံစံအမှားများကို စနစ်က အလိုအလျောက် ပြင်ပေးပါလိမ့်မည်)
-          </p>
           
-          <textarea 
-            [(ngModel)]="importText" 
-            rows="8" 
-            class="w-full bg-slate-900 border border-slate-600 rounded-lg p-4 text-white font-mono text-sm focus:ring-2 focus:ring-cyan-500 focus:outline-none"
-            placeholder="23.1.2026&#10;11:00 AM&#10;43&#10;04:30 PM&#10;91"></textarea>
-          
-          <div class="flex justify-end gap-3 mt-4">
-            <button (click)="showImport.set(false)" class="px-4 py-2 text-slate-400 hover:text-white transition-colors">မလုပ်တော့ပါ</button>
-            <button (click)="processImport()" class="px-6 py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg shadow-lg shadow-green-600/20">
-               ထည့်သွင်းမည်
-            </button>
-          </div>
+          @if(importPreview(); as preview) {
+            <div>
+              <h3 class="text-lg font-bold text-white mb-2">တင်သွင်းမည့်ဒေတာကို စစ်ဆေးအတည်ပြုပါ</h3>
+              <p class="text-sm text-slate-400 mb-4">
+                 အောင်မြင်စွာ ဖတ်ရှုနိုင်သော မှတ်တမ်း <b class="text-green-400">{{ preview.successful.length }}</b> ခု နှင့် ပြင်ဆင်ရန်လိုအပ်သော အချက်အလက် <b class="text-red-400">{{ preview.errors.length }}</b> ခု တွေ့ရှိပါသည်။
+              </p>
+
+              @if (preview.successful.length > 0) {
+                <div class="max-h-48 overflow-y-auto bg-slate-900/50 p-3 rounded-lg border border-slate-700 mb-4">
+                  <h4 class="text-sm font-semibold text-green-400 mb-2">အောင်မြင်သော မှတ်တမ်းများ</h4>
+                  <table class="w-full text-xs">
+                    <tbody>
+                      @for(rec of preview.successful; track rec.date) {
+                        <tr class="border-b border-slate-700 last:border-b-0">
+                          <td class="py-1 pr-2 font-mono text-slate-300">{{ rec.date }}</td>
+                          <td class="py-1 pr-2 text-cyan-400 font-bold">{{ rec.am }}</td>
+                          <td class="py-1 text-purple-400 font-bold">{{ rec.pm }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+              
+              @if (preview.errors.length > 0) {
+                 <div class="max-h-48 overflow-y-auto bg-red-900/20 p-3 rounded-lg border border-red-800">
+                    <h4 class="text-sm font-semibold text-red-300 mb-2">ပြင်ဆင်ရန်လိုအပ်သည်များ</h4>
+                    <ul class="text-xs text-red-400 font-mono list-disc list-inside">
+                      @for(err of preview.errors; track err) {
+                        <li>{{ err }}</li>
+                      }
+                    </ul>
+                 </div>
+              }
+              
+              <div class="flex justify-end gap-3 mt-4">
+                <button (click)="importPreview.set(null)" class="px-4 py-2 text-slate-400 hover:text-white transition-colors">နောက်သို့</button>
+                <button (click)="confirmImport()" class="px-6 py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg shadow-lg shadow-green-600/20" [disabled]="preview.successful.length === 0">
+                   အတည်ပြုပြီး ထည့်သွင်းမည်
+                </button>
+              </div>
+
+            </div>
+          } @else {
+            <h3 class="text-lg font-bold text-white mb-2">အများလိုက် ထည့်သွင်းခြင်း (အလိုအလျောက် သန့်စင်စနစ်)</h3>
+            <p class="text-sm text-slate-400 mb-4">
+               ဒေတာများကို ဤနေရာတွင် Paste ချပါ။ (နေ့စွဲပုံစံအမှားများကို စနစ်က အလိုအလျောက် ပြင်ပေးပါလိမ့်မည်)
+            </p>
+            <textarea 
+              [(ngModel)]="importText" 
+              rows="8" 
+              class="w-full bg-slate-900 border border-slate-600 rounded-lg p-4 text-white font-mono text-sm focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+              placeholder="23.1.2026&#10;11:00 AM&#10;43&#10;04:30 PM&#10;91"></textarea>
+            
+            <div class="flex justify-end gap-3 mt-4">
+              <button (click)="showImport.set(false)" class="px-4 py-2 text-slate-400 hover:text-white transition-colors">မလုပ်တော့ပါ</button>
+              <button (click)="processImport()" class="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg shadow-lg shadow-cyan-600/20" [disabled]="!importText">
+                 စစ်ဆေးမည်
+              </button>
+            </div>
+          }
         </div>
       }
 
@@ -63,8 +108,6 @@ import { StoreService } from '../services/store.service';
                 <th class="px-6 py-4 font-medium">နေ့စွဲ</th>
                 <th class="px-6 py-4 font-medium">မနက်</th>
                 <th class="px-6 py-4 font-medium">ညနေ</th>
-                <th class="px-6 py-4 font-medium">SET Index</th>
-                <th class="px-6 py-4 font-medium">Value</th>
                 <th class="px-6 py-4 font-medium text-right">ဆောင်ရွက်ရန်</th>
               </tr>
             </thead>
@@ -84,8 +127,6 @@ import { StoreService } from '../services/store.service';
                       {{ row.pm }}
                     </span>
                   </td>
-                   <td class="px-6 py-4 text-sm text-slate-400 font-mono">{{ row.set || '-' }}</td>
-                   <td class="px-6 py-4 text-sm text-slate-400 font-mono">{{ row.value || '-' }}</td>
                   <td class="px-6 py-4 text-right">
                     <button (click)="deleteItem(row.id)" class="text-slate-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
                       ဖျက်မည်
@@ -128,6 +169,7 @@ export class HistoryComponent {
   
   showImport = signal(false);
   importText = '';
+  importPreview = signal<{ successful: any[], errors: string[] } | null>(null);
 
   totalPages = computed(() => Math.ceil(this.store.records().length / this.pageSize));
   
@@ -137,13 +179,26 @@ export class HistoryComponent {
   });
 
   processImport() {
-    const { count, errors } = this.store.importBulk(this.importText);
-    alert(`မှတ်တမ်း ${count} ခု ထည့်သွင်းပြီးပါပြီ။ (ကျော်သွားသည်/ပြင်ဆင်သည်: ${errors})`);
-    if (count > 0) {
-      this.importText = '';
-      this.showImport.set(false);
-      this.currentPage.set(0);
+    const result = this.store.parseImportData(this.importText);
+    this.importPreview.set(result);
+  }
+
+  confirmImport() {
+    const preview = this.importPreview();
+    if (preview && preview.successful.length > 0) {
+      preview.successful.forEach(rec => {
+        this.store.addRecord(rec.date, rec.am, rec.pm);
+      });
+      alert(`${preview.successful.length} ခုကို အောင်မြင်စွာ ထည့်သွင်းပြီးပါပြီ။`);
     }
+    this.resetImport();
+  }
+
+  resetImport() {
+    this.importText = '';
+    this.importPreview.set(null);
+    this.showImport.set(false);
+    this.currentPage.set(0);
   }
 
   deleteItem(id: string) {
@@ -161,10 +216,10 @@ export class HistoryComponent {
 
   downloadCSV() {
     const data = this.store.records();
-    const headers = ['Date', 'Day', 'AM', 'PM', 'Set', 'Value'];
+    const headers = ['Date', 'Day', 'AM', 'PM'];
     const csvContent = [
       headers.join(','),
-      ...data.map(row => `${row.date},${row.dayOfWeek},${row.am},${row.pm},"${row.set||''}",${row.value||''}`)
+      ...data.map(row => `${row.date},${row.dayOfWeek},${row.am},${row.pm}`)
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

@@ -45,18 +45,13 @@ export class EngineService {
   private store = inject(StoreService);
 
   // --- CORE PREDICTION ENGINE (v6.0 ENSEMBLE) ---
-  predictNext(customHistory?: LotteryRecord[], liveMarketData?: { set: string, value: string }): PredictionResult {
+  predictNext(customHistory?: LotteryRecord[]): PredictionResult {
     const history = customHistory || this.store.records();
     const weights = this.store.aiWeights();
     
     if (history.length < 5) {
       return this.getEmptyResult();
     }
-
-    // Use live market data if available, otherwise use the last record's data
-    const marketDataSource = liveMarketData 
-      ? { ...history[0], set: liveMarketData.set, value: liveMarketData.value }
-      : history[0];
 
     // 1. DATA PREPARATION
     const dayName = customHistory ? this.store.getDayName(customHistory[0].date) : this.store.getDayName(new Date().toISOString());
@@ -91,28 +86,23 @@ export class EngineService {
 
       // Expert 3: Day of Week
       const dayScore = this.calculateFrequencyScore(dayOfWeekMatches, num) * 1.2;
-
-      // Expert 4: Market Correlation
-      const marketScore = this.calculateMarketScore(marketDataSource, num);
       
-      // Expert 5: Relationship (NEW)
+      // Expert 4: Relationship (NEW)
       const relationshipResult = this.calculateRelationshipScore(num, history);
 
-      // Expert 6: Trend (NEW)
+      // Expert 5: Trend (NEW)
       const trendResult = this.calculateTrendScore(num, history);
 
       // Combine scores with AI Weights
       rawScore += (recencyScore * weights.recency);
       rawScore += (seasonalScore * weights.seasonal);
       rawScore += (dayScore * weights.dayOfWeek);
-      rawScore += (marketScore * weights.market);
       rawScore += (relationshipResult.score * weights.relationship);
       rawScore += (trendResult.score * weights.trend);
 
       // Collect Reasons & Tags
       if (recencyScore > 2) { reasons.push("လတ်တလော အားကောင်း"); tags.push("လတ်တလော"); }
       if (seasonalScore > 2) { reasons.push("ရာသီတူ ပုံစံ"); tags.push("ရာသီ"); }
-      if (marketScore > 5) { reasons.push("ဈေးကွက်ဂဏန်း"); tags.push("ဈေးကွက်"); }
       reasons.push(...relationshipResult.reasons);
       tags.push(...relationshipResult.tags);
       reasons.push(...trendResult.reasons);
@@ -153,7 +143,7 @@ export class EngineService {
       strongestHead,
       strongestTail,
       insights: [
-        `ကျွမ်းကျင်သူ AI များ: လတ်တလော, ဈေးကွက်, ဆက်စပ်မှု, လိုက်ဂဏန်း`,
+        `ကျွမ်းကျင်သူ AI များ: လတ်တလော, ဆက်စပ်မှု, လိုက်ဂဏန်း`,
         `စမ်းသပ်မှု: အကြိမ် ၁၀၀၀ ပြုလုပ်ပြီး`,
         `မထွက်နိုင်သော ဂဏန်း ${excludedNumbers.length} လုံးကို ဖယ်ထုတ်ထားသည်။`
       ],
@@ -173,11 +163,10 @@ export class EngineService {
     // Check which expert would have predicted this
     const recencyPredicts = this.calculateFrequencyScore(history.slice(1, 16), newResult) > 0;
     const seasonalPredicts = this.calculateFrequencyScore(this.getSeasonalMatches(history.slice(1)), newResult) > 0;
-    const marketPredicts = this.calculateMarketScore(history[1], newResult) > 0;
     const relationshipPredicts = this.calculateRelationshipScore(newResult, history.slice(1)).score > 0;
     const trendPredicts = this.calculateTrendScore(newResult, history.slice(1)).score > 0;
 
-    const predictors = [recencyPredicts, seasonalPredicts, marketPredicts, relationshipPredicts, trendPredicts];
+    const predictors = [recencyPredicts, seasonalPredicts, relationshipPredicts, trendPredicts];
     const correctPredictors = predictors.filter(p => p).length;
     if (correctPredictors === 0) return; // No expert predicted it, don't change weights
 
@@ -187,7 +176,6 @@ export class EngineService {
 
     if (recencyPredicts) weights.recency += reward; else weights.recency -= penalty;
     if (seasonalPredicts) weights.seasonal += reward; else weights.seasonal -= penalty;
-    if (marketPredicts) weights.market += reward; else weights.market -= penalty;
     if (relationshipPredicts) weights.relationship += reward; else weights.relationship -= penalty;
     if (trendPredicts) weights.trend += reward; else weights.trend -= penalty;
     
@@ -215,7 +203,6 @@ export class EngineService {
           id: 'temp-sim-id', date: new Date().toISOString().split('T')[0], 
           am: am || '00', pm: pm || '00',
           dayOfWeek: this.store.getDayName(new Date().toISOString()),
-          set: '0.00', value: '0.00' 
       };
       return this.predictNext([scenarioRecord, ...currentHistory]);
   }
@@ -319,17 +306,7 @@ export class EngineService {
     counts.forEach((val, key) => { if (val >= threshold) set.add(key); });
     return set;
   }
-  private calculateMarketScore(lastRecord: { set?: string, value?: string } | LotteryRecord, num: string): number {
-    if (!lastRecord?.set || !lastRecord.value) return 0;
-    const setVal = parseFloat(lastRecord.set.replace(/,/g, ''));
-    const marketVal = parseFloat(lastRecord.value.replace(/,/g, ''));
-    if (isNaN(setVal) || isNaN(marketVal)) return 0;
-    const diffTail = Math.abs(setVal - marketVal).toFixed(2).split('.')[1]?.padStart(2, '0');
-    const sumTail = (setVal + marketVal).toFixed(2).split('.')[1]?.padStart(2, '0');
-    if (num === diffTail) return 10;
-    if (num === sumTail) return 8;
-    return 0;
-  }
+  
   private runMonteCarlo(history: LotteryRecord[], candidate: string, iterations: number): number {
     if (history.length < 50) return 50; 
     let wins = 0;
