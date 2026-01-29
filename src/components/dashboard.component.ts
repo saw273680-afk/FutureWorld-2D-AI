@@ -23,10 +23,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   todayStr = new Date().toISOString().split('T')[0];
   
-  // Signals
+  // Signals for Prediction
   prediction = signal<PredictionResult | null>(null);
   isRefined = signal(false);
-  loadingMessage = signal('AI နှင့် ဆက်သွယ်နေပါသည်...');
+  
+  // Signals for Loading UI
+  loadingSteps = [
+    'AI Engine ကို စတင်နေသည်',
+    'Google Search ဖြင့် ရှာဖွေနေသည်',
+    'Trends များကို သုံးသပ်နေသည်',
+    'AI Model မှ အဖြေထုတ်နေသည်',
+    'ရလဒ်ကို စီစဉ်နေသည်'
+  ];
+  currentLoadingStep = signal(0);
   private loadingInterval: any = null;
   
   entryForm = this.fb.group({
@@ -45,9 +54,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     effect(() => {
       if (this.gemini.isAnalyzing()) {
-        this.startLoadingMessages();
+        this.startLoadingIndicator();
       } else {
-        this.stopLoadingMessages();
+        this.stopLoadingIndicator();
       }
     });
   }
@@ -57,7 +66,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
   
   ngOnDestroy() {
-    this.stopLoadingMessages();
+    this.stopLoadingIndicator();
   }
 
   onSubmit() {
@@ -85,23 +94,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.gemini.cancelAnalysis();
   }
 
-  private startLoadingMessages() {
-    const messages = [
-      'Google Search ဖြင့် ဒေတာရှာဖွေနေပါသည်...',
-      'Trends များကို သုံးသပ်နေပါသည်...',
-      'AI မော်ဒယ်မှ အဖြေကို စီစဉ်နေပါသည်...',
-      'ခေတ္တစောင့်ဆိုင်းပေးပါ။ ချိတ်ဆက်မှု အနည်းငယ်ကြာနေပါသည်။'
-    ];
-    let index = 0;
-    this.loadingMessage.set(messages[index]);
-
+  private startLoadingIndicator() {
+    this.currentLoadingStep.set(0);
     this.loadingInterval = setInterval(() => {
-      index = (index + 1) % messages.length;
-      this.loadingMessage.set(messages[index]);
-    }, 7000); // Change message every 7 seconds
+      this.currentLoadingStep.update(step => {
+        // Stop incrementing at the last step to wait for timeout
+        if (step >= this.loadingSteps.length - 1) {
+          return step;
+        }
+        return step + 1;
+      });
+    }, 6000); // 6 seconds per step
   }
 
-  private stopLoadingMessages() {
+  private stopLoadingIndicator() {
     if (this.loadingInterval) {
       clearInterval(this.loadingInterval);
       this.loadingInterval = null;
